@@ -1,0 +1,164 @@
+:root {
+  --ink: #16191d;
+  --muted: #5c646e;
+  --line: #d7dce2;
+  --bg: #ffffff;
+  --panel: #f6f8fa;
+  --accent: #12507e;
+  --amber-bg: #fdf3d8;
+  --amber-line: #d9ab3a;
+  --amber-ink: #6b4c05;
+  --flag-bg: #fdecec;
+  --flag-ink: #8a2020;
+  --ok-ink: #1c6b3a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--bg);
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+}
+
+a { color: var(--accent); }
+
+header.app {
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+}
+header.app h1 { font-size: 16px; margin: 0; }
+header.app nav { display: flex; gap: 14px; margin-left: auto; }
+
+main { padding: 16px 20px 60px; }
+
+.banner {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+.banner.amber {
+  background: var(--amber-bg);
+  border-color: var(--amber-line);
+  color: var(--amber-ink);
+}
+
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); }
+.tabs button {
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: none;
+  padding: 7px 12px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--muted);
+  border-radius: 4px 4px 0 0;
+}
+.tabs button[aria-selected='true'] {
+  border-color: var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  font-weight: 600;
+  margin-bottom: -1px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+}
+.toolbar input[type='search'] { padding: 5px 8px; border: 1px solid var(--line); border-radius: 4px; min-width: 260px; font: inherit; }
+.count { color: var(--muted); }
+
+button.action {
+  font: inherit;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: 4px;
+  cursor: pointer;
+}
+button.action:hover { background: var(--panel); }
+button.action.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.action:disabled { opacity: 0.5; cursor: default; }
+
+.table-scroll { overflow-x: auto; }
+
+.print-only { display: none; }
+
+table.catalogue { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.catalogue th, table.catalogue td {
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+table.catalogue thead th { background: var(--panel); position: sticky; top: 0; }
+table.catalogue thead th.group { background: #eceff3; }
+table.catalogue tr.sch-header th { top: 28px; }
+table.catalogue td.mono { font-family: Consolas, Menlo, monospace; font-size: 12.5px; letter-spacing: .2px; }
+table.catalogue td.num, table.catalogue th.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.catalogue tr.ticked { background: #eef4fa; }
+
+.price-poa { color: var(--muted); font-style: italic; }
+.price-stale { color: var(--amber-ink); }
+.flag { color: var(--flag-ink); }
+.note { color: var(--muted); font-size: 12px; }
+
+.source-note {
+  font-size: 11.5px;
+  color: var(--muted);
+  padding: 8px 2px;
+}
+
+/* The sheet heading only appears on paper, as in the original tool. */
+.print-note { display: none; }
+
+.empty {
+  border: 1px dashed var(--line);
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  border-radius: 4px;
+}
+
+fieldset { border: 1px solid var(--line); border-radius: 4px; margin: 0 0 14px; padding: 12px 14px; }
+legend { font-weight: 600; padding: 0 4px; }
+label.field { display: block; margin-bottom: 8px; }
+label.field span { display: block; color: var(--muted); margin-bottom: 2px; }
+label.field input, label.field textarea, label.field select {
+  font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 4px; width: 100%; max-width: 420px;
+}
+
+dialog {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 18px 20px;
+  max-width: 520px;
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.18);
+}
+dialog::backdrop { background: rgb(0 0 0 / 0.35); }
+dialog h2 { margin-top: 0; font-size: 16px; }
+dialog .buttons { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+.drawing { border: 1px solid var(--line); border-radius: 4px; background: var(--bg); }
+
+@media print {
+  header.app nav, .toolbar, .tabs, .no-print { display: none !important; }
+  body { font-size: 11px; }
+  main { padding: 0; }
+  table.catalogue { font-size: 10px; }
+  table.catalogue thead th { position: static; }
+  .print-block { break-inside: avoid; }
+  .print-only { display: inline; }
+  .print-note { display: block !important; font-weight: bold; padding: 8px 2px; }
+  input, select { display: none; }
+}
