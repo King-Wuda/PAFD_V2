@@ -1,4 +1,5 @@
 import type { CatalogueColumn, CatalogueSheet, CatalogueTable } from './types'
+import { ROWS } from './rows/ss-threaded'
 
 /**
  * Screwed fittings have no ANSI B 16.9 geometry, so there are no dimensions
@@ -17,8 +18,7 @@ const PAIRED: CatalogueColumn[] = [
 ]
 
 function sheet(id: string, label: string, columns = SINGLE): CatalogueSheet {
-  // PORT PENDING — rows come from Piping_15.html, see docs/PORTING.md
-  return { id, label, name: `SS Threaded Fittings - ${label}`, columns, rows: [] }
+  return { id, label, name: `SS Threaded Fittings - ${label}`, columns, rows: ROWS[id] ?? [] }
 }
 
 export const SS_THREADED: CatalogueTable = {

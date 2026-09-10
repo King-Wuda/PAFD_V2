@@ -1,4 +1,5 @@
 import type { CatalogueColumn, CatalogueSheet, CatalogueTable } from './types'
+import { ROWS } from './rows/a234-fittings'
 
 const SCHEDULES = [
   { id: 'sch40', label: 'Sch 40', group: 'Schedule 40' },
@@ -29,13 +30,12 @@ const PAIRED_END: CatalogueColumn[] = [
 function sheet(
   id: string, label: string, columns: CatalogueColumn[],
 ): CatalogueSheet {
-  // PORT PENDING — rows come from Piping_15.html, see docs/PORTING.md
   return {
     id,
     label,
     name: `Fittings ASTM A234 WPB - ${label}`,
     columns,
-    rows: [],
+    rows: ROWS[id] ?? [],
   }
 }
 

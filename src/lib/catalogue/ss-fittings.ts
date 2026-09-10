@@ -1,4 +1,5 @@
 import type { CatalogueColumn, CatalogueSheet, CatalogueTable } from './types'
+import { ROWS } from './rows/ss-fittings'
 
 const SCHEDULES = [
   { id: 'ss10', label: 'Sch 10S', group: 'Schedule 10S' },
@@ -14,8 +15,7 @@ function perSchedule(idLabel: string, tLabel: string): CatalogueColumn[] {
 }
 
 function sheet(id: string, label: string, columns: CatalogueColumn[]): CatalogueSheet {
-  // PORT PENDING — rows come from Piping_15.html, see docs/PORTING.md
-  return { id, label, name: `SS Fittings 304L / 316L - ${label}`, columns, rows: [] }
+  return { id, label, name: `SS Fittings 304L / 316L - ${label}`, columns, rows: ROWS[id] ?? [] }
 }
 
 const SINGLE_END: CatalogueColumn[] = [

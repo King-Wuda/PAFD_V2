@@ -1,4 +1,5 @@
 import type { CatalogueTable } from './types'
+import { ROWS } from './rows/ss-pipe'
 
 function schedule(variant: string, group: string) {
   return [
@@ -29,7 +30,7 @@ export const SS_PIPE: CatalogueTable = {
         ...schedule('sch10s', 'Schedule 10S'),
         ...schedule('sch40s', 'Schedule 40S'),
       ],
-      rows: [],
+      rows: ROWS['ss-sheet'] ?? [],
     },
   ],
   sourceNote:

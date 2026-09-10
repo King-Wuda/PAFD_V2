@@ -1,4 +1,5 @@
 import type { CatalogueSheet, CatalogueTable } from './types'
+import { ROWS } from './rows/asa300-flanges'
 
 const COLUMNS: CatalogueSheet['columns'] = [
   { key: 'nps', label: 'NPS (Inches)', align: 'center' },
@@ -10,8 +11,7 @@ const COLUMNS: CatalogueSheet['columns'] = [
 ]
 
 function sheet(id: string, label: string): CatalogueSheet {
-  // PORT PENDING — rows come from Piping_15.html, see docs/PORTING.md
-  return { id, label, name: `ASA 300 Flanges - ${label}`, columns: COLUMNS, rows: [] }
+  return { id, label, name: `ASA 300 Flanges - ${label}`, columns: COLUMNS, rows: ROWS[id] ?? [] }
 }
 
 export const ASA300_FLANGES: CatalogueTable = {

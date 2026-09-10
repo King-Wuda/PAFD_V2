@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CATALOGUE } from '@/lib/catalogue'
 import type {
@@ -221,86 +223,121 @@ export function Dashboard({
 
       {staleness && <p className="banner amber">{staleness}</p>}
 
-      <div className="tabs no-print" role="tablist">
-        {CATALOGUE.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={t.id === activeTableId}
-            onClick={() => setActiveTableId(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* Tab strip and the action buttons share one bar, as in the old tool. */}
+      <div className="controls-bar no-print">
+        <div className="tabs" role="tablist">
+          {CATALOGUE.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={t.id === activeTableId}
+              onClick={() => setActiveTableId(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="action-column">
+          <div className="action-buttons">
+            <div className="btn-box">
+              <label className="sub-label">
+                <input
+                  type="checkbox"
+                  checked={showDrawings}
+                  onChange={(e) => setShowDrawings(e.target.checked)}
+                />{' '}
+                Drawings
+              </label>
+              <button className="action copy" onClick={copyGrid} disabled={visibleRows.length === 0}>
+                {copied ? 'Copied' : ticked.size > 0 ? '\u{1F4CB} Copy Checked' : '\u{1F4CB} Copy Grid'}
+              </button>
+              <button className="action print-checked" onClick={() => window.print()}>
+                {'\u{1F5A8}\u{FE0F}'} Print Checked
+              </button>
+              <button className="action print" onClick={() => window.print()}>
+                {'\u{1F5A8}\u{FE0F}'} Print Sheet
+              </button>
+            </div>
+            <div className="btn-box">
+              <Link className="action upload" href="/import" style={{ textDecoration: 'none' }}>
+                {'\u{1F4C2}'} Upload Price List
+              </Link>
+              <a className="action prices" href="#price-schedule" style={{ textDecoration: 'none' }}>
+                {'\u{1F4B5}'} View Prices
+              </a>
+            </div>
+            <div className="btn-box">
+              <button
+                className="action danger"
+                onClick={() => setTicked(new Set())}
+                disabled={ticked.size === 0}
+              >
+                {'\u{1F9F9}'} Clear All{ticked.size > 0 ? ` (${ticked.size})` : ''}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
+      {/* The sub-bar: sheet on the left, variant pushed right, exactly as before. */}
       <div className="toolbar no-print">
         {table.sheets.length > 1 && (
-          <label>
-            {table.sheetLabel ?? 'Sheet:'}{' '}
-            <select
-              value={sheet.id}
-              // Scoped to this table only.
-              onChange={(e) =>
-                setSheetByTable((previous) => ({ ...previous, [table.id]: e.target.value }))
-              }
-            >
-              {table.sheets.map((s) => (
-                <option key={s.id} value={s.id}>{s.label}</option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        {table.variants.length > 1 && (
-          <label>
-            {table.variantLabel ?? 'Schedule:'}{' '}
-            <select
-              value={variant}
-              onChange={(e) =>
-                setVariantByTable((previous) => ({ ...previous, [table.id]: e.target.value }))
-              }
-            >
-              {table.variants.map((v) => (
-                <option key={v.id} value={v.id}>{v.label}</option>
-              ))}
-            </select>
-          </label>
+          <>
+            <span className="sub-label">{table.sheetLabel ?? 'Fitting:'}</span>
+            {table.sheets.map((s) => (
+              <button
+                key={s.id}
+                className="pill"
+                aria-pressed={s.id === sheet.id}
+                // Scoped to this table only: switching a range here cannot
+                // blank another tab's table.
+                onClick={() =>
+                  setSheetByTable((previous) => ({ ...previous, [table.id]: s.id }))
+                }
+              >
+                {s.label}
+              </button>
+            ))}
+          </>
         )}
 
         {table.filter && (
-          <input
-            type="search"
-            placeholder="fitting, size or code"
-            value={filter}
-            onChange={(e) =>
-              setFilterByTable((previous) => ({ ...previous, [table.id]: e.target.value }))
-            }
-          />
+          <>
+            <span className="sub-label">Find:</span>
+            <input
+              type="search"
+              placeholder="fitting, size or code"
+              value={filter}
+              onChange={(e) =>
+                setFilterByTable((previous) => ({ ...previous, [table.id]: e.target.value }))
+              }
+            />
+          </>
         )}
 
         <span className="count">
           {visibleRows.length} of {rowsInVariant.length} rows
-          {ticked.size > 0 && ` · ${ticked.size} ticked`}
+          {ticked.size > 0 && ` \u00b7 ${ticked.size} ticked`}
         </span>
 
-        <button className="action" onClick={copyGrid} disabled={visibleRows.length === 0}>
-          {copied ? 'Copied' : ticked.size > 0 ? 'Copy ticked to Excel' : 'Copy grid to Excel'}
-        </button>
-        <button className="action" onClick={() => setTicked(new Set())} disabled={ticked.size === 0}>
-          Clear all{ticked.size > 0 ? ` (${ticked.size})` : ''}
-        </button>
-        <label>
-          <input
-            type="checkbox"
-            checked={showDrawings}
-            onChange={(e) => setShowDrawings(e.target.checked)}
-          />{' '}
-          Drawings
-        </label>
-        <button className="action" onClick={() => window.print()}>
-          Print
-        </button>
+        {table.variants.length > 1 && (
+          <div className="spacer" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <span className="sub-label">{table.variantLabel ?? 'Schedule:'}</span>
+            {table.variants.map((v) => (
+              <button
+                key={v.id}
+                className="pill variant"
+                aria-pressed={v.id === variant}
+                onClick={() =>
+                  setVariantByTable((previous) => ({ ...previous, [table.id]: v.id }))
+                }
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="print-note">
@@ -322,7 +359,20 @@ export function Dashboard({
 
       <p className="source-note">{table.sourceNote}</p>
 
-      <h2 style={{ marginTop: 28, fontSize: 15 }}>Price schedule</h2>
+      <div className="price-head" id="price-schedule" style={{ marginTop: 28 }}>
+        <div>
+          <h2>Price Schedule</h2>
+          <p className="price-meta">
+            {priceBook.size > 0
+              ? `${priceBook.size} prices loaded${
+                  priceBook.currentEffectiveFrom
+                    ? `, current from ${priceBook.currentEffectiveFrom}`
+                    : ''
+                }`
+              : 'No prices loaded \u2014 import a supplier list to price this schedule.'}
+          </p>
+        </div>
+      </div>
       <PriceSchedule
         lines={scheduleLines}
         onQuantityChange={(key, quantity) =>

@@ -1,4 +1,5 @@
 import type { CatalogueSheet, CatalogueTable } from './types'
+import { ROWS } from './rows/pvc-fittings'
 
 /**
  * Every row here carries a supplier code, so this table is priced purely by
@@ -17,8 +18,7 @@ const COLUMNS: CatalogueSheet['columns'] = [
 ]
 
 function sheet(id: string, label: string, name: string): CatalogueSheet {
-  // PORT PENDING — rows come from Piping_15.html, see docs/PORTING.md
-  return { id, label, name, columns: COLUMNS, rows: [] }
+  return { id, label, name, columns: COLUMNS, rows: ROWS[id] ?? [] }
 }
 
 export const PVC_FITTINGS: CatalogueTable = {

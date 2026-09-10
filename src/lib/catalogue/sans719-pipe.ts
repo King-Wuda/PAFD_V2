@@ -1,4 +1,5 @@
 import type { CatalogueTable } from './types'
+import { ROWS } from './rows/sans719-pipe'
 
 export const SANS719_PIPE: CatalogueTable = {
   id: 'sans719-pipe',
@@ -20,7 +21,7 @@ export const SANS719_PIPE: CatalogueTable = {
         { key: 'm', label: 'Mass (kg/m)', variant: 'x', align: 'center' },
       ],
       // One nominal size appears several times, once per stocked wall thickness.
-      rows: [],
+      rows: ROWS['sans719-sheet'] ?? [],
     },
   ],
   sourceNote:

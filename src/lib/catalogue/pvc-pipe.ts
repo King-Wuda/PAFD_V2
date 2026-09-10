@@ -1,4 +1,5 @@
 import type { CatalogueTable } from './types'
+import { ROWS } from './rows/pvc-pipe'
 
 function pressureClass(variant: string, group: string) {
   return [
@@ -31,7 +32,7 @@ export const PVC_PIPE: CatalogueTable = {
         ...pressureClass('c12', 'Class 12 (12 Bar)'),
         ...pressureClass('c16', 'Class 16 (16 Bar)'),
       ],
-      rows: [],
+      rows: ROWS['pvc-sheet'] ?? [],
     },
   ],
   sourceNote:

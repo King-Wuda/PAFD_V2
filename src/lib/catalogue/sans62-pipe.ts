@@ -1,4 +1,5 @@
 import type { CatalogueTable } from './types'
+import { ROWS } from './rows/sans62-pipe'
 
 function pipeClass(variant: string, group: string) {
   return [
@@ -29,7 +30,7 @@ export const SANS62_PIPE: CatalogueTable = {
         ...pipeClass('med', 'Medium class'),
         ...pipeClass('hvy', 'Heavy class'),
       ],
-      rows: [],
+      rows: ROWS['sans62-sheet'] ?? [],
     },
   ],
   sourceNote:

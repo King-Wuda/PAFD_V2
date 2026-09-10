@@ -1,4 +1,5 @@
 import type { CatalogueTable } from './types'
+import { ROWS } from './rows/ms-pipe'
 
 /** Wall / bore / mass columns, repeated per schedule. */
 function schedule(variant: string, group: string) {
@@ -30,8 +31,7 @@ export const MS_PIPE: CatalogueTable = {
         ...schedule('sch40', 'Schedule 40'),
         ...schedule('sch80', 'Schedule 80'),
       ],
-      // PORT PENDING — rows come from Piping_15.html, see docs/PORTING.md
-      rows: [],
+      rows: ROWS['ms-sheet'] ?? [],
     },
   ],
   sourceNote:

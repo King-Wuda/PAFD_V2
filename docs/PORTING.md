@@ -8,8 +8,20 @@ columns, the source notes, the scale drawings and the price resolution are all
 in place and tested. What is missing is the contents of the `rows: []` arrays in
 `src/lib/catalogue/*.ts`, and the seed price list.
 
-**Put `Piping_15.html` in the repository root and the extraction can be
-scripted.** It is not in the repo today.
+**Put `Piping_15.html` in the repository root and run:**
+
+```bash
+npm run port          # or: npm run port -- /path/to/Piping_15.html
+npm test              # the regression then has data and stops skipping
+```
+
+That writes `src/lib/catalogue/rows/*.ts` (one generated module per table,
+never hand-edited) and `seed/pvc-2026-04-15.csv`. The catalogue modules already
+import those rows, so nothing else has to change.
+
+The script refuses to guess. If a row has a different number of cells than the
+sheet has columns, or its `data-vals` will not parse, it prints the row and
+exits non-zero rather than writing a table with a hole in it.
 
 ## The two axes
 
