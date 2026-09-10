@@ -101,11 +101,21 @@ PVCFGO10063,PVC 90° elbow 63 mm,each,64.49,2026-04-15
 
 - 655 of the entries carry a `code`; those are the PVC lines and they price by
   code-exact match.
-- The rest are Macsteel lines with a description only. Keep them — they are what
-  the guarded fuzzy matcher works against.
+- The other 277 are Macsteel lines with a **description only, no code**, and they
+  cannot go into the seed: `prices.code` is `not null` and the standard CSV of §5
+  requires a code, so there is no key to file them under. Nor do they cost a
+  price — the family guard rejected every one of them in the signed-off tool too,
+  which is exactly what the 655 in §15 measures. `npm run port` writes them to
+  `seed/reference/macsteel-2026-04-15-uncoded.csv` verbatim instead of dropping
+  them, so the day Macsteel supplies codes that file is the head start. It lives
+  in a subdirectory because the regression test picks up any `*.csv` directly
+  under `seed/`.
 - Entries with `"price": 0.0` are **not** free. `PVCFTY10125` is a 125 mm 45° tee
   marked "non-stock, on request" and priced 0.00 in the old file. Import it as an
-  **empty price** (P.O.A.), not as zero, or it will quote at nothing.
+  **empty price** (P.O.A.), not as zero, or it will quote at nothing. This is the
+  one place the port deliberately disagrees with §15: the old table printed
+  "R 0.00" and counted this row among the 655 priced, so the regression asserts
+  654 priced and 6 P.O.A. and says why at the top of the file.
 - The four `PVCCON…` tank connectors and `PVCFRC103150160` print `P.O.A` in the
   table and are absent from `DEFAULT_PRICE_LIST`. They must reach the seed with a
   blank price so they resolve to P.O.A. rather than to nothing. That is 5 P.O.A.
@@ -123,7 +133,8 @@ the drift this rebuild removes. The Price column is rendered from the price book
 
 `tests/regression.test.ts` is dormant until `seed/` has a CSV and the catalogue
 has rows; from then on it asserts the numbers the old tool was signed off
-against — 1,204 rows, 655 priced, 5 P.O.A., 0 wrong, 0 lost.
+against — 1,204 rows, 655 priced, 5 P.O.A., 0 wrong, 0 lost — with the single
+documented exception of PVCFTY10125 above, which makes it 654 and 6.
 
 ## Rules that are not negotiable
 

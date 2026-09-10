@@ -159,7 +159,12 @@ function makeId(row: { code?: string; kind?: string; title: string }, taken: Set
 
 const problems: string[] = []
 
-function extractSheet(sheetHtml: string, sheet: CatalogueSheet, where: string): CatalogueRow[] {
+function extractSheet(
+  sheetHtml: string,
+  sheet: CatalogueSheet,
+  where: string,
+  showPrice: boolean,
+): CatalogueRow[] {
   const taken = new Set<string>()
 
   return tableRows(sheetHtml).map((rowHtml, i) => {
@@ -176,7 +181,13 @@ function extractSheet(sheetHtml: string, sheet: CatalogueSheet, where: string): 
     // Walk columns and cells together. The old file emits one <td> per column
     // — hidden variant cells included — so a length mismatch means the port
     // has drifted from the source and must not be guessed at.
-    const tds = cells(rowHtml).filter((c) => !(c.attr.class ?? '').includes('col-select'))
+    let tds = cells(rowHtml).filter((c) => !(c.attr.class ?? '').includes('col-select'))
+
+    // The old file froze a price cell into the PVC fittings table. Here the
+    // price is looked up live from the database on the supplier code, so the
+    // catalogue has no price column and that cell is dropped rather than
+    // ported — a price baked into geometry is a price nobody can update.
+    if (showPrice) tds = tds.filter((c) => !(c.attr.class ?? '').split(/\s+/).includes('num'))
     if (tds.length !== sheet.columns.length) {
       problems.push(
         `${where} row ${i + 1} ("${decode(a['data-title'] ?? '?')}"): ` +
@@ -229,6 +240,9 @@ const TAB_OF: Record<string, string> = {
   'asa300-flanges': 'flange-tab',
 }
 
+/** Every coded row in the catalogue, so the seed can be checked against it. */
+const codedRows = new Map<string, CatalogueRow>()
+
 const tabIds = Object.values(TAB_OF)
 const outDir = join(ROOT, 'src/lib/catalogue/rows')
 mkdirSync(outDir, { recursive: true })
@@ -244,8 +258,11 @@ for (const table of CATALOGUE) {
 
   for (const sheet of table.sheets) {
     const sheetHtml = block(tabHtml, sheet.id, sheetIds.filter((s) => s !== sheet.id))
-    const rows = extractSheet(sheetHtml, sheet, `${table.id}/${sheet.id}`)
+    const rows = extractSheet(
+      sheetHtml, sheet, `${table.id}/${sheet.id}`, table.showPrice === true,
+    )
     bySheet[sheet.id] = rows
+    for (const row of rows) if (row.code) codedRows.set(row.code.toUpperCase(), row)
     total += rows.length
     console.log(`  ${table.id}/${sheet.id}: ${rows.length} rows`)
   }
@@ -261,6 +278,27 @@ for (const table of CATALOGUE) {
 
 /* ------------------------------------------------------------------ *
  * The seed price list, out of DEFAULT_PRICE_LIST.
+ *
+ * Three things happen here that the old file did not do, all of them recorded
+ * in docs/PORTING.md:
+ *
+ *  1. A 0.00 is written as an empty price, not as zero. The old table printed
+ *     "R 0.00" for PVCFTY10125, a 125 mm tee its own note calls "non-stock, on
+ *     request". Quoting a non-stock item at nothing is a real invoice; P.O.A.
+ *     is the honest answer. This is the one deliberate departure from the §15
+ *     tally, and tests/regression.test.ts says so where it counts.
+ *
+ *  2. The five rows that print "P.O.A" in the table but are absent from
+ *     DEFAULT_PRICE_LIST are added with an empty price, so they resolve to
+ *     P.O.A. rather than to nothing at all.
+ *
+ *  3. The 277 description-only Macsteel lines cannot go in. `prices.code` is
+ *     `not null` and the standard CSV of §5 requires a code, so there is no
+ *     key to store them under. They priced nothing in the signed-off tool
+ *     either — the family guard rejects every one of them, which is what the
+ *     655 in §15 measures — so no price is lost by leaving them out. They are
+ *     written to seed/reference/ verbatim rather than dropped, because the day
+ *     someone gets codes from Macsteel that file is the head start.
  * ------------------------------------------------------------------ */
 
 const listStart = html.indexOf('const DEFAULT_PRICE_LIST = [')
@@ -276,32 +314,55 @@ if (listStart === -1) {
   const csvField = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
   const seen = new Set<string>()
   const lines = ['code,description,unit,price']
+  const uncoded = ['description,unit,price']
   let poa = 0
-  let skipped = 0
 
   for (const e of entries) {
-    // No supplier code means nothing to match on: the standard CSV requires
-    // one, and inventing a key would be worse than leaving the line out.
     const code = (e.code ?? '').toUpperCase().trim()
     if (!code) {
-      skipped++
+      uncoded.push([csvField(decode(e.desc)), csvField(e.unit || 'each'), e.price.toFixed(2)].join(','))
       continue
     }
-    if (seen.has(code)) continue
+    if (seen.has(code)) {
+      problems.push(`DEFAULT_PRICE_LIST carries ${code} twice`)
+      continue
+    }
     seen.add(code)
-    // 0.00 in the old list is "price on request", not free.
     const price = e.price > 0 ? e.price.toFixed(2) : ''
     if (price === '') poa++
-    lines.push(
-      [code, csvField(decode(e.desc)), csvField(e.unit || 'each'), price].join(','),
-    )
+    lines.push([code, csvField(decode(e.desc)), csvField(e.unit || 'each'), price].join(','))
   }
 
-  const seedFile = join(ROOT, 'seed', 'pvc-2026-04-15.csv')
-  writeFileSync(seedFile, lines.join('\n') + '\n')
+  // The P.O.A. rows the price list never carried. Their description comes from
+  // the catalogue row itself, so it reads the same way as every other line.
+  let added = 0
+  for (const [code, row] of codedRows) {
+    if (seen.has(code)) continue
+    const desc = `${row.kind ? `${row.kind} ` : ''}${row.title} ${code}`
+    lines.push([code, csvField(desc), 'each', ''].join(','))
+    seen.add(code)
+    poa++
+    added++
+  }
+
+  // Every coded catalogue row must now have a line, or a row prices to nothing
+  // for a reason nobody will find later.
+  for (const code of codedRows.keys()) {
+    if (!seen.has(code)) problems.push(`catalogue code ${code} has no seed line`)
+  }
+
+  mkdirSync(join(ROOT, 'seed', 'reference'), { recursive: true })
+  writeFileSync(join(ROOT, 'seed', 'pvc-2026-04-15.csv'), lines.join('\n') + '\n')
+  writeFileSync(
+    join(ROOT, 'seed', 'reference', 'macsteel-2026-04-15-uncoded.csv'),
+    uncoded.join('\n') + '\n',
+  )
+
   console.log(
-    `\nseed/pvc-2026-04-15.csv: ${lines.length - 1} coded lines ` +
-      `(${poa} P.O.A., ${skipped} uncoded lines left out — they carry no key to price on)`,
+    `\nseed/pvc-2026-04-15.csv: ${lines.length - 1} lines ` +
+      `(${poa} P.O.A., ${added} added from the catalogue)\n` +
+      `seed/reference/macsteel-2026-04-15-uncoded.csv: ${uncoded.length - 1} lines, ` +
+      `no supplier code — reference only, not importable`,
   )
 }
 

@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:db": "bash scripts/test-db.sh",
-    "port": "node --experimental-strip-types scripts/port-piping.ts"
+    "port": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/port-piping.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

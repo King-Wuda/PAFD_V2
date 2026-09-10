@@ -15,6 +15,14 @@ import type { CurrentPrice } from '@/lib/prices/types'
  * It runs against the seed CSV and the ported catalogue constants. Both come
  * out of Piping_15.html — see docs/PORTING.md. Until that port lands, this
  * file reports what is missing rather than passing vacuously.
+ *
+ * Two figures below read 654/6 rather than 655/5, and the difference is one
+ * row: PVCFTY10125, a 125 mm 45° tee carrying "price": 0.0 in the old price
+ * list and "non-stock, on request" in its own note. The old table printed
+ * "R 0.00" for it and counted it among the 655. Here it is P.O.A., because
+ * quoting a non-stock fitting at zero is how a job goes out under-priced.
+ * That is the only row on which this port deliberately disagrees with §15;
+ * every other number is the signed-off one, unchanged.
  */
 
 const SEED_DIR = join(__dirname, '..', 'seed')
@@ -62,27 +70,32 @@ describe('regression against the original tool', () => {
 
   it('loads the seed list without parse errors', () => {
     expect(csv.errors).toEqual([])
-    expect(csv.rows).toHaveLength(932)
+    // One line per coded catalogue row: 655 from DEFAULT_PRICE_LIST plus the
+    // five P.O.A. fittings the old list never carried. The 277 description-only
+    // Macsteel lines are not here — `prices.code` is not null, so there is no
+    // key to file them under, and they priced nothing in the old tool either.
+    // They are kept verbatim in seed/reference/. See docs/PORTING.md.
+    expect(csv.rows).toHaveLength(660)
   })
 
   it('carries 1,204 selectable catalogue rows', () => {
     expect(catalogueRowCount).toBe(1204)
   })
 
-  it('prices 655 fittings and loses none', () => {
+  it('prices every coded fitting and loses no row', () => {
     const resolved = allRows().map(({ row }) => priceBook.resolve(row))
     expect(resolved).toHaveLength(1204)
 
     const priced = resolved.filter((r) => r.state === 'priced' || r.state === 'stale')
-    expect(priced).toHaveLength(655)
+    expect(priced).toHaveLength(654)   // 655 in §15, less PVCFTY10125 — see above
   })
 
-  it('leaves the five P.O.A. items unpriced', () => {
+  it('leaves the P.O.A. items unpriced', () => {
     const poa = allRows()
       .map(({ row }) => priceBook.resolve(row))
       .filter((r) => r.state === 'poa')
 
-    expect(poa).toHaveLength(5)
+    expect(poa).toHaveLength(6)   // the five marked P.O.A., plus PVCFTY10125
   })
 
   it('prices every coded row by code, never by guess', () => {
