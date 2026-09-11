@@ -292,13 +292,17 @@ for (const table of CATALOGUE) {
  *     DEFAULT_PRICE_LIST are added with an empty price, so they resolve to
  *     P.O.A. rather than to nothing at all.
  *
- *  3. The 277 description-only Macsteel lines cannot go in. `prices.code` is
- *     `not null` and the standard CSV of §5 requires a code, so there is no
- *     key to store them under. They priced nothing in the signed-off tool
- *     either — the family guard rejects every one of them, which is what the
- *     655 in §15 measures — so no price is lost by leaving them out. They are
- *     written to seed/reference/ verbatim rather than dropped, because the day
- *     someone gets codes from Macsteel that file is the head start.
+ *  3. The 277 description-only Macsteel lines get a line reference — MST-0001
+ *     and so on, assigned in description order so a re-run produces the same
+ *     file. `prices.code` is `not null`, and these are real prices for real
+ *     pipe, so a stable key is better than leaving them out.
+ *
+ *     The reference is NOT a supplier code and is never matched on: the family
+ *     guard rejects all 277 against the catalogue, because Macsteel lists the
+ *     same 200 NB Sch 40 pipe three times — Astron approved, Sasol approved and
+ *     plain — at three different rates. Only the person quoting knows which the
+ *     job needs. So these reach the price schedule's match dropdown, where they
+ *     are chosen by hand, exactly as the old file did it.
  * ------------------------------------------------------------------ */
 
 const listStart = html.indexOf('const DEFAULT_PRICE_LIST = [')
@@ -314,13 +318,13 @@ if (listStart === -1) {
   const csvField = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
   const seen = new Set<string>()
   const lines = ['code,description,unit,price']
-  const uncoded = ['description,unit,price']
+  const uncodedEntries: Array<{ desc: string; unit: string; price: number }> = []
   let poa = 0
 
   for (const e of entries) {
     const code = (e.code ?? '').toUpperCase().trim()
     if (!code) {
-      uncoded.push([csvField(decode(e.desc)), csvField(e.unit || 'each'), e.price.toFixed(2)].join(','))
+      uncodedEntries.push({ desc: decode(e.desc), unit: e.unit || 'each', price: e.price })
       continue
     }
     if (seen.has(code)) {
@@ -351,18 +355,24 @@ if (listStart === -1) {
     if (!seen.has(code)) problems.push(`catalogue code ${code} has no seed line`)
   }
 
-  mkdirSync(join(ROOT, 'seed', 'reference'), { recursive: true })
+  // Sorted so the line reference is stable across runs: MST-0007 is the same
+  // pipe tomorrow as it is today, which is what makes a re-import idempotent.
+  uncodedEntries.sort((a, b) => (a.desc < b.desc ? -1 : a.desc > b.desc ? 1 : 0))
+  const uncoded = ['code,description,unit,price']
+  uncodedEntries.forEach((e, i) => {
+    const ref = `MST-${String(i + 1).padStart(4, '0')}`
+    uncoded.push([ref, csvField(e.desc), csvField(e.unit), e.price.toFixed(2)].join(','))
+  })
+
+  mkdirSync(join(ROOT, 'seed'), { recursive: true })
   writeFileSync(join(ROOT, 'seed', 'pvc-2026-04-15.csv'), lines.join('\n') + '\n')
-  writeFileSync(
-    join(ROOT, 'seed', 'reference', 'macsteel-2026-04-15-uncoded.csv'),
-    uncoded.join('\n') + '\n',
-  )
+  writeFileSync(join(ROOT, 'seed', 'macsteel-2026-04-15.csv'), uncoded.join('\n') + '\n')
 
   console.log(
     `\nseed/pvc-2026-04-15.csv: ${lines.length - 1} lines ` +
       `(${poa} P.O.A., ${added} added from the catalogue)\n` +
-      `seed/reference/macsteel-2026-04-15-uncoded.csv: ${uncoded.length - 1} lines, ` +
-      `no supplier code — reference only, not importable`,
+      `seed/macsteel-2026-04-15.csv: ${uncoded.length - 1} lines with a line reference, ` +
+      `no supplier code — matched by hand in the schedule`,
   )
 }
 

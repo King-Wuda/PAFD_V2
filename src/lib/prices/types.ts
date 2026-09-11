@@ -32,8 +32,13 @@ export interface RowPrice {
   supplier: string | null
   /** Date of the list the price came from. */
   effectiveFrom: string | null
-  /** How the price was found. 'code' is exact; 'fuzzy' is the guarded fallback. */
-  matchedBy: 'code' | 'fuzzy' | null
+  /**
+   * How the price was found. 'code' is exact, 'fuzzy' is the guarded fallback,
+   * and 'manual' is a line the person quoting picked themselves — the only way
+   * to price the Macsteel pipe, which is listed at an Astron rate, a Sasol rate
+   * and a plain rate for the same size.
+   */
+  matchedBy: 'code' | 'fuzzy' | 'manual' | null
   /** Code the price was taken from, which may differ from the row's own. */
   matchedCode: string | null
   /** Human note for the cell, e.g. "not on current list (15 Apr 2026)". */

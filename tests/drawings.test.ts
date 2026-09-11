@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { figureForRow } from '@/lib/drawings'
+import { figureForRow, FIG_STYLE } from '@/lib/drawings'
 import type { CatalogueRow } from '@/lib/catalogue/types'
 
 function row(over: Partial<CatalogueRow>): CatalogueRow {
@@ -177,5 +179,38 @@ describe('when there is no drawing', () => {
     })
     expect(figureForRow(pipe, 'sch80')).not.toBeNull()
     expect(figureForRow(pipe, 'sch40')).toBeNull()
+  })
+})
+
+/**
+ * The figures carry class names, not inline attributes, so they are inert
+ * without their stylesheet: every shape falls back to a solid black fill.
+ * That shipped once. The export has always injected FIG_STYLE; the app has to
+ * as well, and the App Router drops arbitrary children from <head>, so the
+ * placement matters and is easy to undo by accident.
+ */
+describe('the figure stylesheet reaches every surface that draws', () => {
+  const read = (path: string) =>
+    readFileSync(join(__dirname, '..', 'src', path), 'utf8')
+
+  it('is injected by the app shell', () => {
+    const layout = read('app/layout.tsx')
+    expect(layout).toContain('FIG_STYLE')
+    // In <body>: the App Router owns <head> and silently drops what it does
+    // not recognise, which is exactly how this broke.
+    expect(layout).not.toMatch(/<head>[\s\S]*FIG_STYLE[\s\S]*<\/head>/)
+  })
+
+  it('is injected by the offline export', () => {
+    expect(read('lib/export/offline.ts')).toContain('FIG_STYLE')
+  })
+
+  it('styles every class the figures actually use', () => {
+    const styled = new Set(
+      [...FIG_STYLE.matchAll(/\.([a-z]+)\s*\{/g)].map((m) => m[1]),
+    )
+    for (const cls of ['wall', 'dim', 'ext', 'lead', 'cl', 'dtx', 'figsvg']) {
+      expect(styled, `.${cls} has no rule`).toContain(cls)
+    }
   })
 })

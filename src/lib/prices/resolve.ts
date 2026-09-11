@@ -47,6 +47,23 @@ export class PriceBook {
     return this.byCode.get(code.trim().toUpperCase()) ?? null
   }
 
+  /** Every loaded price, for the schedule's match dropdown. */
+  get all(): readonly CurrentPrice[] {
+    return this.entries
+  }
+
+  /**
+   * Price a line from a code the user chose by hand.
+   *
+   * Kept apart from `resolve` on purpose: this is the one path where a price
+   * reaches a row that the matcher would not have given it, so it is labelled
+   * 'manual' and the schedule says so.
+   */
+  resolveCode(code: string): RowPrice {
+    const entry = this.lookupByCode(code)
+    return entry ? this.toRowPrice(entry, 'manual') : UNPRICED
+  }
+
   /**
    * Price one catalogue row.
    *
@@ -64,7 +81,7 @@ export class PriceBook {
     return entry ? this.toRowPrice(entry, 'fuzzy') : UNPRICED
   }
 
-  private toRowPrice(entry: CurrentPrice, matchedBy: 'code' | 'fuzzy'): RowPrice {
+  private toRowPrice(entry: CurrentPrice, matchedBy: 'code' | 'fuzzy' | 'manual'): RowPrice {
     const stale = !entry.onCurrentList
     const state = entry.price === null ? 'poa' : stale ? 'stale' : 'priced'
 

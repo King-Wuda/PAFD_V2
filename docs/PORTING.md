@@ -114,15 +114,21 @@ PVCFGO10063,PVC 90° elbow 63 mm,each,64.49,2026-04-15
 
 - 655 of the entries carry a `code`; those are the PVC lines and they price by
   code-exact match.
-- The other 277 are Macsteel lines with a **description only, no code**, and they
-  cannot go into the seed: `prices.code` is `not null` and the standard CSV of §5
-  requires a code, so there is no key to file them under. Nor do they cost a
-  price — the family guard rejected every one of them in the signed-off tool too,
-  which is exactly what the 655 in §15 measures. `npm run port` writes them to
-  `seed/reference/macsteel-2026-04-15-uncoded.csv` verbatim instead of dropping
-  them, so the day Macsteel supplies codes that file is the head start. It lives
-  in a subdirectory because the regression test picks up any `*.csv` directly
-  under `seed/`.
+- The other 277 are Macsteel lines with a **description only, no code**. They go
+  to `seed/macsteel-2026-04-15.csv` with a line reference — `MST-0001` upward,
+  assigned in description order so a re-run is idempotent. The reference is not a
+  supplier code and **nothing is ever matched on it**.
+
+  Those 277 match no catalogue row at all — measured, not assumed: all 544
+  uncoded rows against all 277 lines gives zero matches, which is why §15 counts
+  655 priced out of 1,204. The reason is not a weak matcher. Macsteel lists the
+  same 200 NB Sch 40 pipe three times — Astron approved at R1560.26, Sasol
+  approved at R1285.59, and plain — and only the job knows which is required.
+  Guessing there is how a quote goes out at the wrong rate.
+
+  So they reach the price schedule's **match dropdown** instead, where the person
+  quoting picks one. That is what the old file's `.match-sel` was for, and those
+  lines resolve as `matchedBy: 'manual'`.
 - Entries with `"price": 0.0` are **not** free. `PVCFTY10125` is a 125 mm 45° tee
   marked "non-stock, on request" and priced 0.00 in the old file. Import it as an
   **empty price** (P.O.A.), not as zero, or it will quote at nothing. This is the

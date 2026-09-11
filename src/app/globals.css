@@ -129,6 +129,8 @@ td.sm { font-size: 11.5px; color: #b45309; }
 #price-table td.num, #price-table td.unit, #price-table td.rm { text-align: center; }
 #price-table .d1 { display: block; font-weight: bold; color: #1e293b; font-size: 13.5px; }
 #price-table td.rate { font-variant-numeric: tabular-nums; color: #0f172a; white-space: nowrap; }
+.match-sel { margin-top: 5px; max-width: 100%; width: 340px; font-size: 11.5px;
+    padding: 3px 5px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; }
 .qty-sel { padding: 5px 6px; font-size: 13px; border: 1px solid #94a3b8; border-radius: 4px; }
 #price-table td.total { font-weight: bold; color: #0f172a; white-space: nowrap; }
 .row-remove { border: none; background: none; color: #94a3b8; font-size: 18px;
@@ -150,7 +152,7 @@ td.sm { font-size: 11.5px; color: #b45309; }
     th { background-color: #1e293b !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     tr.sch-header th { background-color: #334155 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .print-note { display: block; font-weight: bold; color: #1e293b; padding: 8px 2px; }
-    .price-actions, .row-remove, #price-table th:last-child,
+    .price-actions, .row-remove, .match-sel, #price-table th:last-child,
     #price-table td.rm { display: none !important; }
     .qty-sel { border: none !important; background: transparent !important;
         -webkit-appearance: none; appearance: none; padding: 0 !important; }
@@ -179,6 +181,8 @@ td.price-stale { color: #b45309; }
 .count { font-size: 11.5px; color: #64748b; font-weight: normal; }
 .flag { display: inline-block; background: #fee2e2; color: #b91c1c; border-radius: 4px;
     padding: 1px 6px; font-size: 11px; font-weight: bold; margin-left: 6px; }
+/* A price the person quoting chose themselves is not a problem to flag red. */
+.flag.matched { background: #dcfce7; color: #15803d; }
 
 /* The scale drawing that opens under a ticked row. */
 .drawing { display: block; margin: 6px auto 2px; max-width: 100%; height: auto; }

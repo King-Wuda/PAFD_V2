@@ -1,6 +1,8 @@
 'use client'
 
+import { useMemo } from 'react'
 import { formatPrice, totalSchedule, type ScheduleLine } from '@/lib/prices/resolve'
+import type { CurrentPrice } from '@/lib/prices/types'
 import { GeaLogo } from './PageHead'
 
 /**
@@ -17,18 +19,33 @@ import { GeaLogo } from './PageHead'
 export function PriceSchedule({
   lines,
   priceStatus,
+  prices,
+  matchOverride,
+  onMatchChange,
   onBack,
   onQuantityChange,
   onRemove,
 }: {
   lines: ScheduleLine[]
   priceStatus: string
+  prices: readonly CurrentPrice[]
+  matchOverride: Record<string, string>
+  onMatchChange: (key: string, code: string) => void
   onBack: () => void
   onQuantityChange: (key: string, quantity: number) => void
   onRemove: (key: string) => void
 }) {
   const total = totalSchedule(lines)
   const excluded = total.poaLines.length + total.unpricedLines.length
+
+  /* Sorted once, not per line — the list runs to several hundred entries. */
+  const options = useMemo(
+    () =>
+      [...prices].sort((a, b) =>
+        (a.description ?? a.code).localeCompare(b.description ?? b.code),
+      ),
+    [prices],
+  )
 
   return (
     <div id="prices-view">
@@ -64,31 +81,62 @@ export function PriceSchedule({
           <table id="price-table">
             <thead>
               <tr>
+                <th>#</th>
                 <th>Description</th>
-                <th>Qty</th>
                 <th>Unit</th>
                 <th>Rate</th>
+                <th>Qty</th>
                 <th>Amount</th>
                 <th className="rm" />
               </tr>
             </thead>
             <tbody>
-              {lines.map((line) => {
+              {lines.map((line, index) => {
                 const { rowPrice } = line
                 const amount = rowPrice.price === null ? null : rowPrice.price * line.quantity
 
                 return (
                   <tr key={line.key}>
+                    <td className="num">{index + 1}</td>
                     <td className="desc">
                       <span className="d1">{line.description}</span>
                       {line.code && <span className="mono">{line.code}</span>}
-                      {rowPrice.state === 'poa' && (
-                        <span className="flag">P.O.A. — excluded</span>
-                      )}
+                      {rowPrice.state === 'poa' && <span className="flag">P.O.A. — excluded</span>}
                       {rowPrice.state === 'unpriced' && (
                         <span className="flag">no price held — excluded</span>
                       )}
                       {rowPrice.state === 'stale' && <span className="flag">{rowPrice.note}</span>}
+                      {rowPrice.matchedBy === 'manual' && (
+                        <span className="flag matched">matched by hand</span>
+                      )}
+                      {/*
+                        The matcher will not guess between Macsteel's Astron,
+                        Sasol and plain rates for the same pipe, so the choice
+                        is offered here — as the old file did it.
+                      */}
+                      {options.length > 0 && (
+                        <select
+                          className="match-sel"
+                          value={matchOverride[line.key] ?? ''}
+                          onChange={(e) => onMatchChange(line.key, e.target.value)}
+                        >
+                          <option value="">
+                            {rowPrice.matchedBy === 'code'
+                              ? `— matched on ${rowPrice.matchedCode} —`
+                              : '— no price list line —'}
+                          </option>
+                          {options.map((price) => (
+                            <option key={price.code} value={price.code}>
+                              {price.description ?? price.code}
+                              {price.price === null ? ' (P.O.A.)' : ` (R ${price.price.toFixed(2)})`}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+                    <td className="unit">{rowPrice.unit ?? ''}</td>
+                    <td className={`rate${rowPrice.state === 'poa' ? ' price-poa' : ''}`}>
+                      {formatPrice(rowPrice)}
                     </td>
                     <td className="num">
                       <input
@@ -100,12 +148,8 @@ export function PriceSchedule({
                         onChange={(e) =>
                           onQuantityChange(line.key, Math.max(0, Number(e.target.value) || 0))
                         }
-                        style={{ width: 70, textAlign: 'right' }}
+                        style={{ width: 66, textAlign: 'right' }}
                       />
-                    </td>
-                    <td className="unit">{rowPrice.unit ?? ''}</td>
-                    <td className={`rate${rowPrice.state === 'poa' ? ' price-poa' : ''}`}>
-                      {formatPrice(rowPrice)}
                     </td>
                     <td className="total">{amount === null ? '—' : `R ${amount.toFixed(2)}`}</td>
                     <td className="rm">
@@ -113,7 +157,7 @@ export function PriceSchedule({
                         className="row-remove"
                         onClick={() => onRemove(line.key)}
                         aria-label={`Remove ${line.description}`}
-                        title="Remove from schedule"
+                        title="Remove this line"
                       >
                         &times;
                       </button>
@@ -124,7 +168,7 @@ export function PriceSchedule({
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={4} style={{ textAlign: 'right' }}>
+                <td colSpan={5} style={{ textAlign: 'right' }}>
                   Total ({total.pricedCount} priced {total.pricedCount === 1 ? 'line' : 'lines'})
                 </td>
                 <td className="total">R {total.total.toFixed(2)}</td>

@@ -1,0 +1,17 @@
+{
+  "_comment": "Which supplier each seed file belongs to. Edit a name here and re-run `npm run seed`; nothing is overwritten, the newer list simply becomes current.",
+  "lists": [
+    {
+      "file": "pvc-2026-04-15.csv",
+      "supplier": "Unrecorded supplier",
+      "effectiveFrom": "2026-04-15",
+      "notes": "PVC lines from Piping_15.html DEFAULT_PRICE_LIST. The supplier was never recorded - the source note says only 'supplier price list dated 15-04-2026'. VAT basis unconfirmed, assumed excluding VAT."
+    },
+    {
+      "file": "macsteel-2026-04-15.csv",
+      "supplier": "Macsteel",
+      "effectiveFrom": "2026-04-15",
+      "notes": "Description-only lines from Piping_15.html DEFAULT_PRICE_LIST. MST-nnnn is a line reference assigned by scripts/port-piping.ts, not a supplier code, and is never matched on. Macsteel lists the same pipe at Astron-approved, Sasol-approved and plain rates, so these are chosen by hand in the price schedule."
+    }
+  ]
+}

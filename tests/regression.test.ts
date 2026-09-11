@@ -26,8 +26,10 @@ import type { CurrentPrice } from '@/lib/prices/types'
  */
 
 const SEED_DIR = join(__dirname, '..', 'seed')
+// Named, not "the first CSV": seed/ also holds the Macsteel list, and which
+// one readdir returns first is not something to hang the regression on.
 const seedFile = existsSync(SEED_DIR)
-  ? readdirSync(SEED_DIR).find((f) => f.endsWith('.csv'))
+  ? readdirSync(SEED_DIR).find((f) => f.startsWith('pvc-') && f.endsWith('.csv'))
   : undefined
 
 const catalogueRowCount = rowCount()

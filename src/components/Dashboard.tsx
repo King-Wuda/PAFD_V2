@@ -57,6 +57,14 @@ export function Dashboard({
 
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set())
   const [quantities, setQuantities] = useState<Record<string, number>>({})
+  /**
+   * Lines the person quoting matched by hand, as schedule key -> price code.
+   *
+   * The matcher deliberately refuses the Macsteel pipe: the same 200 NB Sch 40
+   * is listed Astron-approved, Sasol-approved and plain at three rates, and
+   * only the job knows which. So the choice is offered rather than guessed.
+   */
+  const [matchOverride, setMatchOverride] = useState<Record<string, string>>({})
   const [showDrawings, setShowDrawings] = useState(true)
   /** Which row has its drawing open. Clicking a row previews it; ticking does not. */
   const [previewKey, setPreviewKey] = useState<string | null>(null)
@@ -120,20 +128,21 @@ export function Dashboard({
               variant: tableVariant.id,
             })
             if (!ticked.has(key)) continue
+            const chosen = matchOverride[key]
             lines.push({
               key,
               description:
                 rowDescription(row) + (tableVariant.label ? `, ${tableVariant.label}` : ''),
               code: row.code ?? null,
               quantity: quantities[key] ?? 1,
-              rowPrice: priceBook.resolve(row),
+              rowPrice: chosen ? priceBook.resolveCode(chosen) : priceBook.resolve(row),
             })
           }
         }
       }
     }
     return lines
-  }, [ticked, quantities, priceBook])
+  }, [ticked, quantities, priceBook, matchOverride])
 
   /**
    * Ask periodically whether a newer list exists. Never swap prices under
@@ -222,6 +231,16 @@ export function Dashboard({
       <PriceSchedule
         lines={scheduleLines}
         priceStatus={priceStatus}
+        prices={priceBook.all}
+        matchOverride={matchOverride}
+        onMatchChange={(key, code) =>
+          setMatchOverride((previous) => {
+            const next = { ...previous }
+            if (code) next[key] = code
+            else delete next[key]
+            return next
+          })
+        }
         onBack={() => setView('catalogue')}
         onQuantityChange={(key, quantity) =>
           setQuantities((previous) => ({ ...previous, [key]: quantity }))
