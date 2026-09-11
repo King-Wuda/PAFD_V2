@@ -19,7 +19,7 @@ services:
     branch: main
     buildCommand: npm ci && npm run build
     startCommand: npm start
-    healthCheckPath: /         # answers 200 with or without a database behind it
+    healthCheckPath: /api/health   # cheap liveness probe; `/` would refetch every price
     envVars:
       - key: NODE_VERSION
         value: "24"
