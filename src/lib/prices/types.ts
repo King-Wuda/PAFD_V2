@@ -38,11 +38,20 @@ export interface RowPrice {
    * to price the Macsteel pipe, which is listed at an Astron rate, a Sasol rate
    * and a plain rate for the same size.
    */
-  matchedBy: 'code' | 'fuzzy' | 'manual' | null
+  matchedBy: 'code' | 'spec' | 'fuzzy' | 'manual' | null
   /** Code the price was taken from, which may differ from the row's own. */
   matchedCode: string | null
   /** Human note for the cell, e.g. "not on current list (15 Apr 2026)". */
   note: string | null
+  /**
+   * How many other supplier lines fit this row equally well.
+   *
+   * Non-zero means the supplier sells the same thing more than once — the same
+   * 200 NB Sch 40 pipe plain, Astron approved and Sasol approved — and the one
+   * picked is the least-qualified of them. The schedule says so and offers the
+   * rest, because only the job knows which approval it needs.
+   */
+  alternatives: number
 }
 
 export const UNPRICED: RowPrice = {
@@ -54,4 +63,5 @@ export const UNPRICED: RowPrice = {
   matchedBy: null,
   matchedCode: null,
   note: null,
+  alternatives: 0,
 }

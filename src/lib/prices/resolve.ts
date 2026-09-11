@@ -1,5 +1,6 @@
 import { rowDescription, type CatalogueRow } from '@/lib/catalogue/types'
 import { fuzzyMatch } from './match'
+import { compareCandidates, specKey, specOfPriceLine, specOfRow } from './spec'
 import { UNPRICED, type CurrentPrice, type RowPrice } from './types'
 
 function formatDate(iso: string): string {
@@ -14,10 +15,25 @@ function formatDate(iso: string): string {
  */
 export class PriceBook {
   private readonly byCode = new Map<string, CurrentPrice>()
+  /** Supplier lines grouped by what they are, for the uncoded ranges. */
+  private readonly bySpec = new Map<string, CurrentPrice[]>()
   private readonly entries: readonly CurrentPrice[]
 
   constructor(entries: readonly CurrentPrice[]) {
     this.entries = entries
+    for (const entry of entries) {
+      const spec = specOfPriceLine(entry.description ?? '')
+      if (spec) {
+        const key = specKey(spec)
+        const bucket = this.bySpec.get(key)
+        if (bucket) bucket.push(entry)
+        else this.bySpec.set(key, [entry])
+      }
+    }
+    // Dearest first: where the supplier sells the same thing at several rates
+    // and nothing says which the job needs, the quote should not be the one
+    // that comes up short. See compareCandidates.
+    for (const bucket of this.bySpec.values()) bucket.sort(compareCandidates)
     for (const entry of entries) {
       const key = entry.code.trim().toUpperCase()
       const existing = this.byCode.get(key)
@@ -67,21 +83,53 @@ export class PriceBook {
   /**
    * Price one catalogue row.
    *
-   * Code-exact first, always. The fuzzy fallback runs only when the row has no
-   * code at all — never as a second chance for a code that missed, because a
-   * code that missed means we genuinely do not have that price.
+   * Code-exact first, always — and never a second chance for a code that
+   * missed, because a code that missed means we genuinely do not have that
+   * price.
+   *
+   * Without a code, the structured match runs: it needs to know which table
+   * and schedule the row is being shown in, because "8\" MS pipe (200 NB)"
+   * does not say whether it is Sch 40 or Sch 80 and the two are different
+   * products at different prices. That is what `where` carries.
+   *
+   * The old word-overlap matcher stays as the last resort for anything the
+   * templates do not cover.
    */
-  resolve(row: CatalogueRow): RowPrice {
+  resolve(
+    row: CatalogueRow,
+    where?: { table: string; sheet: string; variant: string },
+  ): RowPrice {
     if (row.code) {
       const entry = this.lookupByCode(row.code)
       return entry ? this.toRowPrice(entry, 'code') : UNPRICED
+    }
+
+    if (where) {
+      const spec = specOfRow(where.table, where.sheet, row, where.variant)
+      const bucket = spec ? this.bySpec.get(specKey(spec)) : undefined
+      if (bucket && bucket.length > 0) {
+        return this.toRowPrice(bucket[0], 'spec', bucket.length - 1)
+      }
     }
 
     const entry = fuzzyMatch(rowDescription(row), this.entries)
     return entry ? this.toRowPrice(entry, 'fuzzy') : UNPRICED
   }
 
-  private toRowPrice(entry: CurrentPrice, matchedBy: 'code' | 'fuzzy' | 'manual'): RowPrice {
+  /** The supplier lines that fit this row, best first. For the dropdown. */
+  candidatesFor(
+    row: CatalogueRow,
+    where: { table: string; sheet: string; variant: string },
+  ): readonly CurrentPrice[] {
+    const spec = specOfRow(where.table, where.sheet, row, where.variant)
+    return (spec && this.bySpec.get(specKey(spec))) ?? []
+  }
+
+  private toRowPrice(
+    entry: CurrentPrice,
+    matchedBy: 'code' | 'spec' | 'fuzzy' | 'manual',
+    alternatives = 0,
+  ): RowPrice {
     const stale = !entry.onCurrentList
     const state = entry.price === null ? 'poa' : stale ? 'stale' : 'priced'
 
@@ -96,6 +144,7 @@ export class PriceBook {
       note: stale
         ? `not on current list — price from ${formatDate(entry.effectiveFrom)}`
         : null,
+      alternatives,
     }
   }
 }
@@ -121,6 +170,11 @@ export interface ScheduleLine {
   code: string | null
   quantity: number
   rowPrice: RowPrice
+  /**
+   * Supplier lines that fit this row, best first. Empty for a coded row: its
+   * price is exact and there is nothing to choose between.
+   */
+  candidates?: readonly CurrentPrice[]
 }
 
 export interface ScheduleTotal {

@@ -126,9 +126,19 @@ PVCFGO10063,PVC 90° elbow 63 mm,each,64.49,2026-04-15
   approved at R1285.59, and plain — and only the job knows which is required.
   Guessing there is how a quote goes out at the wrong rate.
 
-  So they reach the price schedule's **match dropdown** instead, where the person
-  quoting picks one. That is what the old file's `.match-sel` was for, and those
-  lines resolve as `matchedBy: 'manual'`.
+  They are matched **structurally** rather than by word overlap — see
+  `src/lib/prices/spec.ts`. Both sides carry the same three facts (what it is,
+  what size, which variant), and the supplier writes them to a template, so the
+  fields are read off each side and compared exactly. That needs the schedule
+  the row is being *shown* in, which is why `resolve()` takes a `where`.
+
+  Where several lines still fit — Astron approved, Sasol approved — the
+  **dearest** is quoted, the line is flagged, and the rest are one dropdown
+  away. Quoting short on a job already won is the more expensive mistake.
+
+  Ranges the supplier does not carry at all (the A234 carbon fittings, SS pipe,
+  PVC pipe) stay blank, and `tests/spec.test.ts` asserts they stay at zero — a
+  number appearing there means something has started guessing.
 - Entries with `"price": 0.0` are **not** free. `PVCFTY10125` is a 125 mm 45° tee
   marked "non-stock, on request" and priced 0.00 in the old file. Import it as an
   **empty price** (P.O.A.), not as zero, or it will quote at nothing. This is the

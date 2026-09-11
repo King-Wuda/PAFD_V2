@@ -135,7 +135,18 @@ export function Dashboard({
                 rowDescription(row) + (tableVariant.label ? `, ${tableVariant.label}` : ''),
               code: row.code ?? null,
               quantity: quantities[key] ?? 1,
-              rowPrice: chosen ? priceBook.resolveCode(chosen) : priceBook.resolve(row),
+              rowPrice: chosen
+                ? priceBook.resolveCode(chosen)
+                : priceBook.resolve(row, {
+                    table: catalogueTable.id,
+                    sheet: catalogueSheet.id,
+                    variant: tableVariant.id,
+                  }),
+              candidates: priceBook.candidatesFor(row, {
+                table: catalogueTable.id,
+                sheet: catalogueSheet.id,
+                variant: tableVariant.id,
+              }),
             })
           }
         }
@@ -165,10 +176,20 @@ export function Dashboard({
   }, [configured, loadedAt])
 
   /** Ticked rows if there are any, else what is on screen — as the old tool did. */
-  const gridSelection = useCallback((): { sheet: CatalogueSheet; variant: string; rows: CatalogueRow[] }[] => {
-    if (ticked.size === 0) return [{ sheet, variant, rows: visibleRows }]
+  const gridSelection = useCallback((): {
+    table: string
+    sheet: CatalogueSheet
+    variant: string
+    rows: CatalogueRow[]
+  }[] => {
+    if (ticked.size === 0) return [{ table: table.id, sheet, variant, rows: visibleRows }]
 
-    const groups: { sheet: CatalogueSheet; variant: string; rows: CatalogueRow[] }[] = []
+    const groups: {
+      table: string
+      sheet: CatalogueSheet
+      variant: string
+      rows: CatalogueRow[]
+    }[] = []
     for (const catalogueTable of CATALOGUE) {
       for (const catalogueSheet of catalogueTable.sheets) {
         for (const tableVariant of catalogueTable.variants) {
@@ -180,12 +201,19 @@ export function Dashboard({
               variant: tableVariant.id,
             })),
           )
-          if (rows.length > 0) groups.push({ sheet: catalogueSheet, variant: tableVariant.id, rows })
+          if (rows.length > 0) {
+            groups.push({
+              table: catalogueTable.id,
+              sheet: catalogueSheet,
+              variant: tableVariant.id,
+              rows,
+            })
+          }
         }
       }
     }
     return groups
-  }, [ticked, sheet, variant, visibleRows])
+  }, [ticked, table, sheet, variant, visibleRows])
 
   const copyGrid = useCallback(async () => {
     const blocks: string[] = []
@@ -194,7 +222,11 @@ export function Dashboard({
       const columns = visibleColumns(group.sheet, group.variant)
       const header = [...columns.map((c) => c.label), 'Price', 'Unit']
       const body = group.rows.map((row) => {
-        const rowPrice = priceBook.resolve(row)
+        const rowPrice = priceBook.resolve(row, {
+          table: group.table,
+          sheet: group.sheet.id,
+          variant: group.variant,
+        })
         return [
           ...columns.map((column) =>
             (column.variant ? row.values[group.variant]?.[column.key] : row.fixed[column.key]) ?? '',

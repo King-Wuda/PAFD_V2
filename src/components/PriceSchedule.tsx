@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { formatPrice, totalSchedule, type ScheduleLine } from '@/lib/prices/resolve'
 import type { CurrentPrice } from '@/lib/prices/types'
 import { GeaLogo } from './PageHead'
@@ -37,6 +37,31 @@ export function PriceSchedule({
 }) {
   const total = totalSchedule(lines)
   const excluded = total.poaLines.length + total.unpricedLines.length
+
+  /*
+   * Lines where the reader has asked to see the full list. A match found on
+   * the supplier's own code is exact, so it gets no dropdown at all; the rest
+   * get one only when there is genuinely something to choose between, with
+   * "change" to open it up for the cases there is not.
+   */
+  const [opened, setOpened] = useState<ReadonlySet<string>>(new Set())
+  const open = (key: string) =>
+    setOpened((previous) => new Set(previous).add(key))
+
+  /*
+   * A line needs the dropdown up front when the automatic answer is not
+   * trustworthy on its own: nothing was found, or the supplier sells more than
+   * one thing that fits. Everything else hides it behind "change".
+   */
+  const needsChoice = (line: ScheduleLine) =>
+    line.rowPrice.state === 'unpriced' ||
+    line.rowPrice.matchedBy === 'fuzzy' ||
+    line.rowPrice.alternatives > 0
+
+  const label = (price: CurrentPrice) =>
+    `${price.description ?? price.code}${
+      price.price === null ? ' (P.O.A.)' : ` (R ${price.price.toFixed(2)})`
+    }`
 
   /* Sorted once, not per line — the list runs to several hundred entries. */
   const options = useMemo(
@@ -107,32 +132,53 @@ export function PriceSchedule({
                       )}
                       {rowPrice.state === 'stale' && <span className="flag">{rowPrice.note}</span>}
                       {rowPrice.matchedBy === 'manual' && (
-                        <span className="flag matched">matched by hand</span>
+                        <span className="flag matched">chosen by hand</span>
+                      )}
+                      {rowPrice.matchedBy === 'spec' && rowPrice.alternatives > 0 && (
+                        <span className="flag choose">
+                          {rowPrice.alternatives} other{rowPrice.alternatives === 1 ? '' : 's'} fit
+                          — check this is the right one
+                        </span>
                       )}
                       {/*
-                        The matcher will not guess between Macsteel's Astron,
-                        Sasol and plain rates for the same pipe, so the choice
-                        is offered here — as the old file did it.
+                        A code match is exact and needs no second-guessing, so
+                        it gets no control. Everything else is a judgement the
+                        reader can overrule.
                       */}
-                      {options.length > 0 && (
-                        <select
-                          className="match-sel"
-                          value={matchOverride[line.key] ?? ''}
-                          onChange={(e) => onMatchChange(line.key, e.target.value)}
-                        >
-                          <option value="">
-                            {rowPrice.matchedBy === 'code'
-                              ? `— matched on ${rowPrice.matchedCode} —`
-                              : '— no price list line —'}
-                          </option>
-                          {options.map((price) => (
-                            <option key={price.code} value={price.code}>
-                              {price.description ?? price.code}
-                              {price.price === null ? ' (P.O.A.)' : ` (R ${price.price.toFixed(2)})`}
+                      {rowPrice.matchedBy !== 'code' &&
+                        (needsChoice(line) || opened.has(line.key) ? (
+                          <select
+                            className="match-sel"
+                            value={matchOverride[line.key] ?? ''}
+                            onChange={(e) => onMatchChange(line.key, e.target.value)}
+                          >
+                            <option value="">
+                              {rowPrice.matchedBy === 'spec' || rowPrice.matchedBy === 'fuzzy'
+                                ? `— matched automatically: ${rowPrice.matchedCode} —`
+                                : '— no price —'}
                             </option>
-                          ))}
-                        </select>
-                      )}
+                            {(line.candidates?.length ?? 0) > 0 && (
+                              <optgroup label="Fits this row">
+                                {line.candidates!.map((price) => (
+                                  <option key={price.code} value={price.code}>
+                                    {label(price)}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            <optgroup label="Every price held">
+                              {options.map((price) => (
+                                <option key={price.code} value={price.code}>
+                                  {label(price)}
+                                </option>
+                              ))}
+                            </optgroup>
+                          </select>
+                        ) : (
+                          <button type="button" className="price-reset" onClick={() => open(line.key)}>
+                            change
+                          </button>
+                        ))}
                     </td>
                     <td className="unit">{rowPrice.unit ?? ''}</td>
                     <td className={`rate${rowPrice.state === 'poa' ? ' price-poa' : ''}`}>

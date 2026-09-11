@@ -138,7 +138,9 @@ export function CatalogueTableView({
             const key = rowKey({ table: table.id, sheet: sheet.id, row: row.id, variant })
             const isTicked = ticked.has(key)
             const made = hasVariant(row, variant)
-            const rowPrice = priceBook.resolve(row)
+            const rowPrice = priceBook.resolve(row, {
+              table: table.id, sheet: sheet.id, variant,
+            })
             const figure = figureForRow(row, variant, variantLabel)
             const isPreviewed = previewKey === key
 

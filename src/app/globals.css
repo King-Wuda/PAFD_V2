@@ -183,6 +183,8 @@ td.price-stale { color: #b45309; }
     padding: 1px 6px; font-size: 11px; font-weight: bold; margin-left: 6px; }
 /* A price the person quoting chose themselves is not a problem to flag red. */
 .flag.matched { background: #dcfce7; color: #15803d; }
+/* Matched automatically, but the supplier sells more than one thing that fits. */
+.flag.choose { background: #fef3c7; color: #92400e; }
 
 /* The scale drawing that opens under a ticked row. */
 .drawing { display: block; margin: 6px auto 2px; max-width: 100%; height: auto; }

@@ -53,7 +53,27 @@ export function renderOfflineHtml(prices: readonly CurrentPrice[], now = new Dat
         align: column.align ?? 'center',
       })),
       rows: sheet.rows.map((row) => {
-        const rowPrice = priceBook.resolve(row)
+        /*
+         * One price per variant, not one per row: the same 200 NB pipe is a
+         * different product at Sch 40 and Sch 80 and the supplier charges
+         * accordingly. Resolved here, at export time, and baked in beside the
+         * geometry — the offline copy makes no network calls of any kind.
+         */
+        const byVariant: Record<
+          string,
+          { price: string; amount: number | null; note: string }
+        > = {}
+        for (const tableVariant of table.variants) {
+          const rowPrice = priceBook.resolve(row, {
+            table: table.id, sheet: sheet.id, variant: tableVariant.id,
+          })
+          byVariant[tableVariant.id] = {
+            price: formatPrice(rowPrice),
+            amount: rowPrice.state === 'poa' ? null : rowPrice.price,
+            note: rowPrice.note ?? (rowPrice.state === 'poa' ? 'P.O.A.' : ''),
+          }
+        }
+        const first = byVariant[table.variants[0].id]
         return {
           id: row.id,
           code: row.code ?? '',
@@ -61,11 +81,11 @@ export function renderOfflineHtml(prices: readonly CurrentPrice[], now = new Dat
           note: row.note ?? '',
           fixed: row.fixed,
           values: row.values,
-          // Prices are resolved here, at export time, and baked in beside the
-          // geometry. The offline copy makes no network calls of any kind.
-          price: formatPrice(rowPrice),
-          amount: rowPrice.state === 'poa' ? null : rowPrice.price,
-          priceNote: rowPrice.note ?? (rowPrice.state === 'poa' ? 'P.O.A.' : ''),
+          byVariant,
+          // Kept for the single-variant tables and as the fallback.
+          price: first.price,
+          amount: first.amount,
+          priceNote: first.note,
         }
       }),
     })),
@@ -150,6 +170,11 @@ const key = (t, s, r, v) => t + ':' + s + ':' + r + ':' + v;
 const made = (row, v) => Object.prototype.hasOwnProperty.call(row.values, v);
 const cols = (sheet, v) => sheet.columns.filter((c) => !c.variant || c.variant === v);
 const cell = (row, col, v) => (col.variant ? (row.values[v] || {})[col.key] : row.fixed[col.key]);
+// The price for the schedule showing. A row is a different product in each
+// schedule, so it carries one price per variant; older exports had only the
+// single field, which is the fallback.
+const px = (row, v) => (row.byVariant && row.byVariant[v])
+  || { price: row.price, amount: row.amount, note: row.priceNote };
 
 function rowsFor(t) {
   const s = sheetOf(t), v = variantOf(t);
@@ -234,6 +259,7 @@ function renderGrid() {
 
   const body = rows.map((r) => {
     const k = key(t.id, s.id, r.id, v);
+    const p = px(r, v);
     return '<tr class="' + (ticked.has(k) ? 'ticked' : '') + '">' +
       '<td class="no-print"><input type="checkbox" data-key="' + k + '"' + (ticked.has(k) ? ' checked' : '') + '></td>' +
       columns.map((c) => {
@@ -241,7 +267,7 @@ function renderGrid() {
         const value = cell(r, c, v);
         return '<td class="' + cls.trim() + '">' + esc(value == null ? '-' : value) + '</td>';
       }).join('') +
-      (t.showPrice ? '<td class="num" title="' + esc(r.priceNote) + '">' + esc(r.price) + '</td>' : '') +
+      (t.showPrice ? '<td class="num" title="' + esc(p.note) + '">' + esc(p.price) + '</td>' : '') +
       '</tr>';
   }).join('');
 
@@ -271,11 +297,12 @@ function renderSchedule() {
   }
   let total = 0, excluded = 0, body = '';
   groups.forEach((g) => g.rows.forEach((r) => {
-    if (typeof r.amount === 'number') total += r.amount; else excluded++;
+    const p = px(r, g.variant.id);
+    if (typeof p.amount === 'number') total += p.amount; else excluded++;
     body += '<tr><td class="mono">' + esc(r.code) + '</td><td class="lft">' + esc(r.description) +
       (g.variant.label ? ', ' + esc(g.variant.label) : '') +
-      '</td><td class="num">1</td><td class="num">' + esc(r.price) +
-      '</td><td class="lft note">' + esc(r.priceNote) + '</td></tr>';
+      '</td><td class="num">1</td><td class="num">' + esc(p.price) +
+      '</td><td class="lft note">' + esc(p.note) + '</td></tr>';
   }));
   el('schedule').innerHTML =
     '<div class="scroll"><table><thead><tr><th>Code</th><th class="lft">Description</th>' +
@@ -305,7 +332,7 @@ el('copy').onclick = () => {
     const header = columns.map((c) => c.label).concat(['Price']).join('\\t');
     const lines = g.rows.map((r) =>
       columns.map((c) => { const value = cell(r, c, g.variant.id); return value == null ? '' : value; })
-        .concat([r.price]).join('\\t'));
+        .concat([px(r, g.variant.id).price]).join('\\t'));
     return [g.sheet.name, header].concat(lines).join('\\n');
   });
   navigator.clipboard.writeText(blocks.join('\\n\\n'));
