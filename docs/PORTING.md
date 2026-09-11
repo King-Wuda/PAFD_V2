@@ -13,6 +13,19 @@ in place and tested. What is missing is the contents of the `rows: []` arrays in
 ```bash
 npm run port          # or: npm run port -- /path/to/Piping_15.html
 npm test              # the regression then has data and stops skipping
+npm run seed          # load seed/*.csv into the database
+```
+
+`npm run port` only writes files. Until `npm run seed` runs, the database is
+empty and every Price cell is blank — the catalogue itself does not carry
+prices, by design. Seeding goes through `import_price_list`, the same function
+the import screen uses, so the seed arrives by the route a real list does and
+gets the same history. It is safe to re-run; nothing is overwritten.
+
+Pass the supplier once it is known — the 2026-04-15 list never recorded one:
+
+```bash
+npm run seed -- --supplier "Macsteel"
 ```
 
 That writes `src/lib/catalogue/rows/*.ts` (one generated module per table,

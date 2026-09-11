@@ -12,7 +12,9 @@ import { PriceBook, stalenessWarning, type ScheduleLine } from '@/lib/prices/res
 import type { CurrentPrice } from '@/lib/prices/types'
 import { fetchLatestImportedAt } from '@/lib/data'
 import { CatalogueTableView, visibleColumns } from './CatalogueTableView'
+import { PageHead } from './PageHead'
 import { PriceSchedule } from './PriceSchedule'
+import { RowDrawing } from './RowDrawing'
 
 /** How often to ask whether someone else has imported a list. */
 const FRESHNESS_POLL_MS = 5 * 60 * 1000
@@ -55,7 +57,15 @@ export function Dashboard({
 
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set())
   const [quantities, setQuantities] = useState<Record<string, number>>({})
-  const [showDrawings, setShowDrawings] = useState(false)
+  const [showDrawings, setShowDrawings] = useState(true)
+  /** Which row has its drawing open. Clicking a row previews it; ticking does not. */
+  const [previewKey, setPreviewKey] = useState<string | null>(null)
+  /**
+   * Which of the old file's two views is showing. `viewPrices()` there hid the
+   * whole dashboard rather than scrolling, and the tick state has to survive
+   * the switch, so this is a view toggle and not a route.
+   */
+  const [view, setView] = useState<'catalogue' | 'prices'>('catalogue')
   const [newListAvailable, setNewListAvailable] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -200,21 +210,50 @@ export function Dashboard({
 
   const staleness = stalenessWarning(priceBook.currentEffectiveFrom)
 
+  const priceStatus =
+    priceBook.size > 0
+      ? `${priceBook.size} prices loaded${
+          priceBook.currentEffectiveFrom ? `, current from ${priceBook.currentEffectiveFrom}` : ''
+        }`
+      : 'No price list loaded'
+
+  if (view === 'prices') {
+    return (
+      <PriceSchedule
+        lines={scheduleLines}
+        priceStatus={priceStatus}
+        onBack={() => setView('catalogue')}
+        onQuantityChange={(key, quantity) =>
+          setQuantities((previous) => ({ ...previous, [key]: quantity }))
+        }
+        onRemove={(key) =>
+          setTicked((previous) => {
+            const next = new Set(previous)
+            next.delete(key)
+            return next
+          })
+        }
+      />
+    )
+  }
+
   return (
-    <>
+    <div id="dashboard">
+      <PageHead />
+
       {!configured && (
         <p className="banner amber">
           The price database is not configured, so every price is blank. Set{' '}
           <code>NEXT_PUBLIC_SUPABASE_URL</code> and{' '}
-          <code>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code>.
-          Blank is deliberate — a missing price is safer than a stale one.
+          <code>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code>. Blank is deliberate — a missing
+          price is safer than a stale one.
         </p>
       )}
 
       {newListAvailable && (
         <p className="banner">
           New price list available —{' '}
-          <button className="action" onClick={() => window.location.reload()}>
+          <button className="price-reset" onClick={() => window.location.reload()}>
             reload
           </button>
           . Your ticked rows will be cleared, so finish the quote first if you are mid-way.
@@ -224,14 +263,16 @@ export function Dashboard({
       {staleness && <p className="banner amber">{staleness}</p>}
 
       {/* Tab strip and the action buttons share one bar, as in the old tool. */}
-      <div className="controls-bar no-print">
-        <div className="tabs" role="tablist">
+      <div className="controls-bar">
+        <div className="tabs-container">
           {CATALOGUE.map((t) => (
             <button
               key={t.id}
-              role="tab"
-              aria-selected={t.id === activeTableId}
-              onClick={() => setActiveTableId(t.id)}
+              className={`tab-button${t.id === activeTableId ? ' active' : ''}`}
+              onClick={() => {
+                setActiveTableId(t.id)
+                setPreviewKey(null)
+              }}
             >
               {t.label}
             </button>
@@ -241,7 +282,7 @@ export function Dashboard({
         <div className="action-column">
           <div className="action-buttons">
             <div className="btn-box">
-              <label className="sub-label">
+              <label className="fig-opt" title="Include the drawings when printing checked items">
                 <input
                   type="checkbox"
                   checked={showDrawings}
@@ -249,27 +290,39 @@ export function Dashboard({
                 />{' '}
                 Drawings
               </label>
-              <button className="action copy" onClick={copyGrid} disabled={visibleRows.length === 0}>
+              <button
+                className="btn-action btn-copy"
+                onClick={copyGrid}
+                disabled={visibleRows.length === 0}
+              >
                 {copied ? 'Copied' : ticked.size > 0 ? '\u{1F4CB} Copy Checked' : '\u{1F4CB} Copy Grid'}
               </button>
-              <button className="action print-checked" onClick={() => window.print()}>
+              <button className="btn-action btn-print-checked" onClick={() => window.print()}>
                 {'\u{1F5A8}\u{FE0F}'} Print Checked
               </button>
-              <button className="action print" onClick={() => window.print()}>
+              <button className="btn-action btn-print" onClick={() => window.print()}>
                 {'\u{1F5A8}\u{FE0F}'} Print Sheet
               </button>
             </div>
             <div className="btn-box">
-              <Link className="action upload" href="/import" style={{ textDecoration: 'none' }}>
+              <Link className="btn-action btn-upload" href="/import">
                 {'\u{1F4C2}'} Upload Price List
               </Link>
-              <a className="action prices" href="#price-schedule" style={{ textDecoration: 'none' }}>
-                {'\u{1F4B5}'} View Prices
+              <button className="btn-action btn-prices" onClick={() => setView('prices')}>
+                {'\u{1F4B5}'} View Prices{ticked.size > 0 ? ` (${ticked.size})` : ''}
+              </button>
+            </div>
+            <div className="btn-box">
+              <Link className="btn-action btn-history" href="/history">
+                {'\u{1F551}'} History
+              </Link>
+              <a className="btn-action btn-offline" href="/export" download>
+                {'\u{1F4BE}'} Offline copy
               </a>
             </div>
             <div className="btn-box">
               <button
-                className="action danger"
+                className="btn-action btn-clear"
                 onClick={() => setTicked(new Set())}
                 disabled={ticked.size === 0}
               >
@@ -277,61 +330,62 @@ export function Dashboard({
               </button>
             </div>
           </div>
+          <div className={`price-status${priceBook.size > 0 ? ' ok' : ''}`}>{priceStatus}</div>
         </div>
       </div>
 
-      {/* The sub-bar: sheet on the left, variant pushed right, exactly as before. */}
-      <div className="toolbar no-print">
-        {table.sheets.length > 1 && (
-          <>
-            <span className="sub-label">{table.sheetLabel ?? 'Fitting:'}</span>
-            {table.sheets.map((s) => (
-              <button
-                key={s.id}
-                className="pill"
-                aria-pressed={s.id === sheet.id}
-                // Scoped to this table only: switching a range here cannot
-                // blank another tab's table.
-                onClick={() =>
-                  setSheetByTable((previous) => ({ ...previous, [table.id]: s.id }))
-                }
-              >
-                {s.label}
-              </button>
-            ))}
-          </>
-        )}
+      {/* The sub-bar: sheet and filter left, variant pushed right, as before. */}
+      <div className="sub-bar">
+        <div className="sub-group">
+          {table.sheets.length > 1 && (
+            <>
+              <span className="sub-label">{table.sheetLabel ?? 'Fitting:'}</span>
+              {table.sheets.map((s) => (
+                <button
+                  key={s.id}
+                  className={`sub-btn${s.id === sheet.id ? ' active' : ''}`}
+                  // Scoped to this table only: switching a range here cannot
+                  // blank another tab's table.
+                  onClick={() => {
+                    setSheetByTable((previous) => ({ ...previous, [table.id]: s.id }))
+                    setPreviewKey(null)
+                  }}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </>
+          )}
 
-        {table.filter && (
-          <>
-            <span className="sub-label">Find:</span>
+          {table.filter && (
             <input
               type="search"
-              placeholder="fitting, size or code"
+              className="row-filter"
+              placeholder="Find a fitting, size or code"
               value={filter}
               onChange={(e) =>
                 setFilterByTable((previous) => ({ ...previous, [table.id]: e.target.value }))
               }
             />
-          </>
-        )}
+          )}
 
-        <span className="count">
-          {visibleRows.length} of {rowsInVariant.length} rows
-          {ticked.size > 0 && ` \u00b7 ${ticked.size} ticked`}
-        </span>
+          <span className="count">
+            {visibleRows.length} of {rowsInVariant.length} rows
+            {ticked.size > 0 && ` \u00b7 ${ticked.size} ticked`}
+          </span>
+        </div>
 
         {table.variants.length > 1 && (
-          <div className="spacer" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <div className="sub-group variant-group">
             <span className="sub-label">{table.variantLabel ?? 'Schedule:'}</span>
             {table.variants.map((v) => (
               <button
                 key={v.id}
-                className="pill variant"
-                aria-pressed={v.id === variant}
-                onClick={() =>
+                className={`sub-btn variant-btn${v.id === variant ? ' active' : ''}`}
+                onClick={() => {
                   setVariantByTable((previous) => ({ ...previous, [table.id]: v.id }))
-                }
+                  setPreviewKey(null)
+                }}
               >
                 {v.label}
               </button>
@@ -354,39 +408,28 @@ export function Dashboard({
         priceBook={priceBook}
         ticked={ticked}
         onToggle={toggleRow}
-        showDrawings={showDrawings}
+        previewKey={previewKey}
+        onPreview={setPreviewKey}
       />
 
       <p className="source-note">{table.sourceNote}</p>
 
-      <div className="price-head" id="price-schedule" style={{ marginTop: 28 }}>
-        <div>
-          <h2>Price Schedule</h2>
-          <p className="price-meta">
-            {priceBook.size > 0
-              ? `${priceBook.size} prices loaded${
-                  priceBook.currentEffectiveFrom
-                    ? `, current from ${priceBook.currentEffectiveFrom}`
-                    : ''
-                }`
-              : 'No prices loaded \u2014 import a supplier list to price this schedule.'}
-          </p>
+      {/* Drawings for the ticked rows, on the printed sheet only. */}
+      {showDrawings && ticked.size > 0 && (
+        <div className="print-only">
+          {gridSelection().flatMap((group) =>
+            group.rows.map((row) => (
+              <RowDrawing
+                key={`${group.sheet.id}-${row.id}-${group.variant}`}
+                row={row}
+                variant={group.variant}
+              />
+            )),
+          )}
         </div>
-      </div>
-      <PriceSchedule
-        lines={scheduleLines}
-        onQuantityChange={(key, quantity) =>
-          setQuantities((previous) => ({ ...previous, [key]: quantity }))
-        }
-      />
-
-      {prices.length > 0 && (
-        <p className="note" style={{ marginTop: 20 }}>
-          {priceBook.size} prices loaded
-          {priceBook.currentEffectiveFrom && `, current from ${priceBook.currentEffectiveFrom}`}.
-          Unmatched rows show no price rather than a guessed one.
-        </p>
       )}
-    </>
+
+      {copied && <div className="toast-notification show">Copied to clipboard</div>}
+    </div>
   )
 }
