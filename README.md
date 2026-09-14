@@ -65,9 +65,13 @@ A key in a GitHub secret does not reach the function. The edge runtime reads
 its own project's secrets and nothing else; a GitHub secret is visible only to
 a GitHub Actions runner.
 
-Without all three the panel says so and the CSV path is unaffected. Roughly a
-rand or two per list imported, so the useful guard against a runaway is a
-monthly spend cap on the Anthropic account rather than anything in this repo.
+Without all three the panel says so and the CSV path is unaffected.
+
+Reading one supplier list costs a dollar or two — tens of rands, not hundreds,
+and not cents. It is billed per token to the Anthropic account, which is
+separate from any Claude.ai subscription and is not funded by one. The useful
+guard against a runaway is a monthly spend cap set on that account, not
+anything in this repository.
 
 There is no auth, by decision: the data is not confidential and this is an
 internal work tool. Writes are gated by a confirmation dialogue in the UI, and
