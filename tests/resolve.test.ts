@@ -62,6 +62,25 @@ describe('code-exact resolution', () => {
     expect(formatPrice(result)).toBe('P.O.A.')
   })
 
+  it('names the supplier the price came from, and none when nothing matched', () => {
+    // The schedule shows this beside the rate, so a quote says who is being
+    // quoted. A row with no price has no supplier to name — blank, not a guess.
+    const twoSuppliers = new PriceBook([
+      entry({ code: 'PVC1', price: 10, supplier: 'Thermoplastics Co' }),
+      entry({ code: 'MST1', price: 20, supplier: 'Macsteel' }),
+    ])
+    expect(twoSuppliers.resolve(row({ id: 'r1', code: 'PVC1' })).supplier).toBe(
+      'Thermoplastics Co',
+    )
+    expect(twoSuppliers.resolve(row({ id: 'r2', code: 'MST1' })).supplier).toBe('Macsteel')
+    expect(twoSuppliers.resolve(row({ id: 'r3', code: 'NOPE' })).supplier).toBeNull()
+  })
+
+  it('names the supplier on P.O.A. and stale lines too', () => {
+    expect(book.resolve(row({ id: 'r3', code: 'PVCCON1110' })).supplier).toBe('Thermoplastics Co')
+    expect(book.resolve(row({ id: 'r4', code: 'PVCFOLD1' })).supplier).toBe('Thermoplastics Co')
+  })
+
   it('keeps a code that has fallen off the current list, and flags it', () => {
     const result = book.resolve(row({ id: 'r4', code: 'PVCFOLD1' }))
     expect(result.state).toBe('stale')
