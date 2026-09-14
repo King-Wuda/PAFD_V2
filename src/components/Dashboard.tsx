@@ -100,6 +100,22 @@ export function Dashboard({
     [rowsInVariant, variant, filter],
   )
 
+  /**
+   * The ticked rows of the sheet on screen.
+   *
+   * Printing puts these on paper and nothing else, so this is also what says
+   * whether there is anything to print. Rows ticked on another tab are not
+   * counted: only the active tab goes to the printer, so counting them would
+   * offer a print that came out empty.
+   */
+  const tickedHere = useMemo(
+    () =>
+      visibleRows.filter((row) =>
+        ticked.has(rowKey({ table: table.id, sheet: sheet.id, row: row.id, variant })),
+      ),
+    [visibleRows, ticked, table.id, sheet.id, variant],
+  )
+
   const toggleRow = useCallback((key: string) => {
     setTicked((previous) => {
       const next = new Set(previous)
@@ -348,11 +364,20 @@ export function Dashboard({
               >
                 {copied ? 'Copied' : ticked.size > 0 ? '\u{1F4CB} Copy Checked' : '\u{1F4CB} Copy Grid'}
               </button>
-              <button className="btn-action btn-print-checked" onClick={() => window.print()}>
+              <button
+                className="btn-action btn-print-checked"
+                onClick={() => window.print()}
+                disabled={tickedHere.length === 0}
+                title={
+                  tickedHere.length === 0
+                    ? 'Tick the rows you want on paper first.'
+                    : `Print the ${tickedHere.length} ticked ${
+                        tickedHere.length === 1 ? 'row' : 'rows'
+                      } of this sheet.`
+                }
+              >
                 {'\u{1F5A8}\u{FE0F}'} Print Checked
-              </button>
-              <button className="btn-action btn-print" onClick={() => window.print()}>
-                {'\u{1F5A8}\u{FE0F}'} Print Sheet
+                {tickedHere.length > 0 ? ` (${tickedHere.length})` : ''}
               </button>
             </div>
             <div className="btn-box">
@@ -466,17 +491,11 @@ export function Dashboard({
       <p className="source-note">{table.sourceNote}</p>
 
       {/* Drawings for the ticked rows, on the printed sheet only. */}
-      {showDrawings && ticked.size > 0 && (
+      {showDrawings && tickedHere.length > 0 && (
         <div className="print-only">
-          {gridSelection().flatMap((group) =>
-            group.rows.map((row) => (
-              <RowDrawing
-                key={`${group.sheet.id}-${row.id}-${group.variant}`}
-                row={row}
-                variant={group.variant}
-              />
-            )),
-          )}
+          {tickedHere.map((row) => (
+            <RowDrawing key={`${sheet.id}-${row.id}-${variant}`} row={row} variant={variant} />
+          ))}
         </div>
       )}
 
