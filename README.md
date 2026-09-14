@@ -16,7 +16,7 @@ database.** When someone imports a new supplier list, everyone sees it.
 | 3. All tabs, filter, ticking, copy grid, print, price schedule | Done. |
 | 4. CSV import: parse → diff → confirm → write | Done. |
 | 5. History and rollback | Done. |
-| 6. Chat import via edge function | Done, unverified against the live API. |
+| 6. Chat import via edge function | Written and hardened. **Unverified against the live API** — no key has been set yet. |
 | 7. Freshness banners | Done. |
 | 8. Offline HTML export | Done. |
 
@@ -42,9 +42,32 @@ a missing price is safe, a stale or guessed one is not.
 
 ```bash
 supabase db push                      # applies supabase/migrations/0001_init.sql
-supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+```
+
+## Turning on chat import
+
+Chat import is the one part of this that costs money and talks to the outside
+world, so it is off until three things are set. It reads a supplier's file in
+whatever layout it arrived in; it still writes nothing, and its rows go to the
+same diff and the same confirmation as a hand-made CSV.
+
+```bash
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-...          # a key with billing on it
+supabase secrets set ALLOWED_ORIGINS=https://<the app>     # who may call the function
 supabase functions deploy chat-import
 ```
+
+The third is `NEXT_PUBLIC_SUPABASE_URL` on the web service. Next inlines it at
+build time, so it must be set *before* the build that is meant to use it — a
+value added afterwards reaches nobody until the next deploy.
+
+A key in a GitHub secret does not reach the function. The edge runtime reads
+its own project's secrets and nothing else; a GitHub secret is visible only to
+a GitHub Actions runner.
+
+Without all three the panel says so and the CSV path is unaffected. Roughly a
+rand or two per list imported, so the useful guard against a runaway is a
+monthly spend cap on the Anthropic account rather than anything in this repo.
 
 There is no auth, by decision: the data is not confidential and this is an
 internal work tool. Writes are gated by a confirmation dialogue in the UI, and

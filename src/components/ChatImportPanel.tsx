@@ -14,6 +14,23 @@ const FUNCTION_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chat-import`
   : null
 
+/**
+ * The function reports its failures as `{ error }` — a long list cut off
+ * mid-row, a missing key, a file it declined to read. Show that sentence, not
+ * the JSON it arrived in. Anything that is not JSON is a gateway error page,
+ * and the status is the useful part of it.
+ */
+async function errorFrom(response: Response): Promise<string> {
+  const body = await response.text()
+  try {
+    const parsed = JSON.parse(body) as { error?: unknown }
+    if (typeof parsed.error === 'string') return parsed.error
+  } catch {
+    // Not JSON. Fall through.
+  }
+  return `${response.status} ${body}`.trim()
+}
+
 async function toAttachment(file: File): Promise<ChatAttachment> {
   const name = file.name
   const lower = name.toLowerCase()
@@ -85,13 +102,23 @@ export function ChatImportPanel({
         body: JSON.stringify({ turns: nextTurns, attachment: file, supplierName, effectiveFrom }),
       })
 
-      if (!response.ok) throw new Error(`${response.status} ${await response.text()}`)
+      if (!response.ok) throw new Error(await errorFrom(response))
 
       const result = (await response.json()) as ChatImportReply
       setReply(result)
       setTurns([...nextTurns, { role: 'assistant', text: result.message }])
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      // A blocked cross-origin request never reaches the function, so the
+      // browser hands back a bare TypeError with nothing in it. Name the most
+      // likely cause rather than showing 'Failed to fetch'.
+      setError(
+        cause instanceof TypeError
+          ? 'Could not reach the chat import function — it may not be deployed, or this ' +
+            'site may not be in its ALLOWED_ORIGINS.'
+          : cause instanceof Error
+            ? cause.message
+            : String(cause),
+      )
     } finally {
       setBusy(false)
     }

@@ -10,6 +10,7 @@
  * the browser:
  *
  *   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+ *   supabase secrets set ALLOWED_ORIGINS=https://<the deployed app>
  *   supabase functions deploy chat-import
  */
 
@@ -17,10 +18,50 @@ import Anthropic from 'npm:@anthropic-ai/sdk@^0.72.0'
 import { zodOutputFormat } from 'npm:@anthropic-ai/sdk@^0.72.0/helpers/zod'
 import { z } from 'npm:zod@^3.23.8'
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+/**
+ * Which sites may call this function.
+ *
+ *   supabase secrets set ALLOWED_ORIGINS=https://pafd.onrender.com
+ *
+ * Comma-separated if the app is reachable at more than one address. Left
+ * unset, only local development is allowed — that is the safe default,
+ * because every call to this endpoint spends money at the model API, and a
+ * wildcard would let any page on the internet spend it.
+ */
+const ALLOWED_ORIGINS = (Deno.env.get('ALLOWED_ORIGINS') ?? 'http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter((origin) => origin !== '')
+
+function corsFor(origin: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    // The allowed origin varies per request, so caches must key on it.
+    Vary: 'Origin',
+  }
+  if (origin !== null && ALLOWED_ORIGINS.includes(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin
+  }
+  return headers
+}
+
+/**
+ * A browser always sends `Origin` on a cross-site POST, so the allow-list
+ * stops another site from spending the firm's model credit. A caller with no
+ * `Origin` at all — curl, or the app's own server — is let through; what
+ * stands in front of those is the project key the platform checks before the
+ * request ever reaches this code.
+ */
+function isAllowed(origin: string | null): boolean {
+  return origin === null || ALLOWED_ORIGINS.includes(origin)
+}
+
+function json(body: unknown, status: number, cors: Record<string, string>): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...cors, 'Content-Type': 'application/json' },
+  })
 }
 
 const ReplySchema = z.object({
@@ -74,17 +115,25 @@ You are proposing rows for a human to review against a diff. You are not writing
 database, and you should not claim to have done so.`
 
 Deno.serve(async (request: Request) => {
-  if (request.method === 'OPTIONS') return new Response('ok', { headers: CORS })
+  const origin = request.headers.get('Origin')
+  const cors = corsFor(origin)
+
+  if (request.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (request.method !== 'POST') {
-    return new Response('POST only', { status: 405, headers: CORS })
+    return new Response('POST only', { status: 405, headers: cors })
+  }
+
+  if (!isAllowed(origin)) {
+    // No allow-origin header goes back with this, so the browser hides the
+    // body from the page that asked. The readable version is in the function
+    // logs, which is where whoever set ALLOWED_ORIGINS will be looking.
+    console.error(`Refused a call from ${origin}; ALLOWED_ORIGINS is ${ALLOWED_ORIGINS.join(', ')}`)
+    return json({ error: `This function does not accept calls from ${origin}.` }, 403, cors)
   }
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!apiKey) {
-    return new Response(
-      JSON.stringify({ error: 'ANTHROPIC_API_KEY is not set on this function.' }),
-      { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } },
-    )
+    return json({ error: 'ANTHROPIC_API_KEY is not set on this function.' }, 500, cors)
   }
 
   try {
@@ -129,7 +178,7 @@ Deno.serve(async (request: Request) => {
     // non-streaming request that size risks an HTTP timeout.
     const stream = client.messages.stream({
       model: 'claude-opus-5',
-      max_tokens: 64000,
+      max_tokens: 128000,
       system: SYSTEM,
       thinking: { type: 'adaptive' },
       output_config: {
@@ -142,9 +191,21 @@ Deno.serve(async (request: Request) => {
     const final = await stream.finalMessage()
 
     if (final.stop_reason === 'refusal') {
-      return new Response(
-        JSON.stringify({ error: 'The model declined to read this file.' }),
-        { status: 422, headers: { ...CORS, 'Content-Type': 'application/json' } },
+      return json({ error: 'The model declined to read this file.' }, 422, cors)
+    }
+
+    if (final.stop_reason === 'max_tokens') {
+      // The reply is one JSON document, so a cut-off response is not a short
+      // list — it is an unreadable one. Say that, rather than letting it fail
+      // later as a parse error that reads like a bug.
+      return json(
+        {
+          error:
+            'That list was too long to come back in one piece — it was cut off mid-row, ' +
+            'so none of it can be used. Split the file and import it in parts.',
+        },
+        413,
+        cors,
       )
     }
 
@@ -153,7 +214,17 @@ Deno.serve(async (request: Request) => {
       .map((block) => block.text)
       .join('')
 
-    const parsed = ReplySchema.parse(JSON.parse(text))
+    let parsed: z.infer<typeof ReplySchema>
+    try {
+      parsed = ReplySchema.parse(JSON.parse(text))
+    } catch (cause) {
+      console.error('Unreadable reply from the model:', cause, text.slice(0, 2_000))
+      return json(
+        { error: 'The model returned something this function could not read as price rows.' },
+        502,
+        cors,
+      )
+    }
 
     // Normalise here so the client gets exactly the standard shape.
     const rows = parsed.rows
@@ -165,15 +236,13 @@ Deno.serve(async (request: Request) => {
       }))
       .filter((row) => row.code !== '')
 
-    return new Response(
-      JSON.stringify({ message: parsed.message, interpretation: parsed.interpretation, rows }),
-      { headers: { ...CORS, 'Content-Type': 'application/json' } },
+    return json(
+      { message: parsed.message, interpretation: parsed.interpretation, rows },
+      200,
+      cors,
     )
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause)
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
-      headers: { ...CORS, 'Content-Type': 'application/json' },
-    })
+    return json({ error: message }, 500, cors)
   }
 })
