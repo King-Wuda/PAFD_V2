@@ -1,0 +1,17 @@
+# Supabase CLI configuration.
+#
+# `project_id` names the local development stack only. Which hosted project a
+# deploy goes to is whatever `supabase link` points at, not this file.
+project_id = "pafd"
+
+[functions.chat-import]
+# The platform checks the caller's project key before a request reaches the
+# function. Keep that on: without it the endpoint is open to anyone who learns
+# the URL, and every call to it spends money at the model API.
+#
+# If the first live call comes back 401, this project issues the newer
+# `sb_publishable_...` keys and this gate does not accept them as JWTs. Set
+# this to false and redeploy; the origin allow-list inside the function is then
+# what stands in front of the model, and the spend cap on the Anthropic
+# account is what bounds the damage if that is not enough.
+verify_jwt = true

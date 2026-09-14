@@ -109,6 +109,7 @@ export function PriceSchedule({
                 <th>#</th>
                 <th>Description</th>
                 <th>Unit</th>
+                <th>Supplier</th>
                 <th>Rate</th>
                 <th>Qty</th>
                 <th>Amount</th>
@@ -181,6 +182,11 @@ export function PriceSchedule({
                         ))}
                     </td>
                     <td className="unit">{rowPrice.unit ?? ''}</td>
+                    {/*
+                      Blank, not a dash or a guess, when no price was matched:
+                      there is no supplier to name because nothing was found.
+                    */}
+                    <td className="supplier">{rowPrice.supplier ?? ''}</td>
                     <td className={`rate${rowPrice.state === 'poa' ? ' price-poa' : ''}`}>
                       {formatPrice(rowPrice)}
                     </td>
@@ -214,7 +220,7 @@ export function PriceSchedule({
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={5} style={{ textAlign: 'right' }}>
+                <td colSpan={6} style={{ textAlign: 'right' }}>
                   Total ({total.pricedCount} priced {total.pricedCount === 1 ? 'line' : 'lines'})
                 </td>
                 <td className="total">R {total.total.toFixed(2)}</td>
