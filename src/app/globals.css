@@ -128,7 +128,7 @@ td.sm { font-size: 11.5px; color: #b45309; }
 #price-table td.desc { text-align: left; }
 #price-table td.num, #price-table td.unit, #price-table td.rm { text-align: center; }
 #price-table .d1 { display: block; font-weight: bold; color: #1e293b; font-size: 13.5px; }
-#price-table td.supplier { text-align: left; font-size: 12px; color: #475569; }
+#price-table td.supplier { text-align: left; font-size: 14px; font-weight: bold; color: #1e293b; }
 #price-table td.rate { font-variant-numeric: tabular-nums; color: #0f172a; white-space: nowrap; }
 .match-sel { margin-top: 5px; max-width: 100%; width: 340px; font-size: 11.5px;
     padding: 3px 5px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; }
@@ -148,8 +148,17 @@ td.sm { font-size: 11.5px; color: #b45309; }
     .tab-content { display: none !important; }
     .tab-content.active { display: block !important; }
     .preview-row { display: none !important; }
+    /* Only the ticked rows go on paper. A dimension table runs to a couple of
+       hundred rows and nobody wants that out of the printer to read four of
+       them. Scoped to the catalogue: the price schedule is built from the
+       ticked rows already, and marks none of its own. */
+    .table-container tbody tr:not(.selected) { display: none !important; }
     .table-container { box-shadow: none; border: 1px solid #000; }
-    tbody tr.selected { background-color: #fef08a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    /* No highlight on paper. It marked the ticked rows among the unticked
+       ones; now that only ticked rows print, it is a page of solid yellow and
+       colour toner spent saying nothing. The screen keeps it — there it still
+       tells the two apart. Bold is dropped with it, for the same reason. */
+    tbody tr.selected { background-color: transparent !important; font-weight: normal; }
     th { background-color: #1e293b !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     tr.sch-header th { background-color: #334155 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .print-note { display: block; font-weight: bold; color: #1e293b; padding: 8px 2px; }
